@@ -1,0 +1,12 @@
+npm install react-native-url-polyfill  
+npm install @react-native-google-signin/google-signin
+npm install @expo/vector-icons
+npm install react-native-image-picker
+npm install react-native-dropdown-picker
+npm install axios
+npm install @supabase/supabase-js
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install @react-native-async-storage/async-storage
+npx react-native run-android
