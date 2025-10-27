@@ -12,8 +12,11 @@ import LabTests from "./LabTests.tsx";
 import LabDetailsScreen from "./LabDetailsScreen.tsx";
 import PrescriptionPage from './PrescriptionPage';
 import PersonalDetailsScreen from './PersonalDetailsScreen.tsx';
+import AppointmentsScreen from "./AppointmentsScreen.tsx";
+import ManagePrescriptionsScreen from "./ManagePrescriptionsScreen.tsx";
 import DoctorPage from './DoctorPortal.tsx'; 
 import Articles from "./Articles.tsx";
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
@@ -119,7 +122,9 @@ const App = () => {
           <>
             <Stack.Screen name="DoctorPage" component={DoctorPage} options={{ headerShown: false }} />
             <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
-          </>
+            <Stack.Screen name="AppointmentsScreen" component={AppointmentsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ManagePrescriptionsScreen" component={ManagePrescriptionsScreen} options={{ headerShown: false }} />
+</>
         ) : (
           // Normal user screens
           <>

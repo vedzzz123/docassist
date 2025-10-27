@@ -69,8 +69,12 @@ const HomePage: React.FC<HomePageProps> = ({ session }) => {
       navigation.navigate('PrescriptionPage', { session: session });
     } else if (title === 'Book Appointments') {
       navigation.navigate('SelectDoctor');
-    } else if (title === 'AI Chatbot') {
+    } else if (title === 'Book Lab Tests') {
+      navigation.navigate('BookLab');
+    }  else if (title === 'AI Chatbot') {
       navigation.navigate('Chatbot');
+    } else if (title === 'Health Articles') {
+      navigation.navigate('Articles', { session: session });
     }
   };
 
@@ -165,6 +169,7 @@ const HomePage: React.FC<HomePageProps> = ({ session }) => {
             { icon: '🧬', title: 'Book Lab Tests' },
             { icon: '📂', title: 'Upload Past Prescriptions' },
             { icon: '💬', title: 'AI Chatbot' },
+            { icon: '📰', title: 'Health Articles' },
           ].map((item, index) => (
             <Pressable
               key={index}
@@ -274,6 +279,11 @@ const getStyles = (isDarkMode: boolean) =>
       shadowOpacity: 0.1,
       shadowRadius: 6,
     },
+    // ✅ UPDATED: Full width style for Health Articles
+    fullWidthBox: {
+      width: '100%',
+      minHeight: 120, // Makes it bigger vertically
+    },
     icon: {
       fontSize: 40,
       marginBottom: 10,
@@ -286,5 +296,5 @@ const getStyles = (isDarkMode: boolean) =>
       color: isDarkMode ? '#fff' : '#333',
     },
   });
-
+  
 export default HomePage;
