@@ -16,13 +16,16 @@ import AppointmentsScreen from "./AppointmentsScreen.tsx";
 import ManagePrescriptionsScreen from "./ManagePrescriptionsScreen.tsx";
 import DoctorPage from './DoctorPortal.tsx'; 
 import Articles from "./Articles.tsx";
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 import { Session } from '@supabase/supabase-js';
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import Chatbot from "./Chatbot.tsx";
+import PatientsListScreen from './PatientsListScreen';
+import PatientFilesScreen from './PatientFilesScreen';
+import ImageViewerScreen from './ImageViewerScreen';
+
 import RazorpayCheckout from 'react-native-razorpay';
 
 GoogleSignin.configure({
@@ -116,6 +119,9 @@ const App = () => {
             <Stack.Screen name="SelectDoctor" component={SelectDoctor} />
             <Stack.Screen name="Chatbot" component={Chatbot} />
             <Stack.Screen name="Articles" component={Articles} />
+            <Stack.Screen name="PatientsListScreen" component={PatientsListScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="PatientFilesScreen" component={PatientFilesScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ImageViewerScreen" component={ImageViewerScreen} options={{ headerShown: false }} />
           </>
         ) : isDoctorMode ? (
           // Doctor mode screens
@@ -124,7 +130,10 @@ const App = () => {
             <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
             <Stack.Screen name="AppointmentsScreen" component={AppointmentsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="ManagePrescriptionsScreen" component={ManagePrescriptionsScreen} options={{ headerShown: false }} />
-</>
+            <Stack.Screen name="PatientsListScreen" component={PatientsListScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="PatientFilesScreen" component={PatientFilesScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ImageViewerScreen" component={ImageViewerScreen} options={{ headerShown: false }} />
+</>       
         ) : (
           // Normal user screens
           <>

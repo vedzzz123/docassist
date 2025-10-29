@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  Pressable, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Alert, 
-  Animated, 
-  Dimensions, 
-  useColorScheme 
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Animated,
+  Dimensions,
+  useColorScheme,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { CommonActions } from '@react-navigation/native';
@@ -21,10 +21,10 @@ const DoctorPortal: React.FC = () => {
   const [theme, setTheme] = useState(systemTheme === 'dark' ? 'dark' : 'light');
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useState(new Animated.Value(-screenWidth))[0];
-  
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<any>(); // ✅ Add <any> here
 
-  const handleNavigation = (screen: string) => {
+  // ✅ Fix the function typing
+  const handleNavigation = (screen: any) => {
     navigation.navigate(screen);
   };
 
@@ -81,21 +81,15 @@ const DoctorPortal: React.FC = () => {
           <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
             <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity style={styles.menuItem} onPress={toggleTheme}>
-            <Text style={styles.menuText}>
-              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            </Text>
+            <Text style={styles.menuText}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Settings Clicked')}>
             <Text style={styles.menuText}>Settings</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity style={styles.menuItem} onPress={signOut}>
             <Text style={styles.menuText}>Sign Out</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('DoctorProfile')}>
             <Text style={styles.menuText}>My Profile</Text>
           </TouchableOpacity>
@@ -103,25 +97,20 @@ const DoctorPortal: React.FC = () => {
       )}
 
       {/* Dashboard Content */}
-      <ScrollView style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.welcomeTitle}>👨‍⚕️ Welcome, Dr. Mehta</Text>
         <Text style={styles.welcomeSubtitle}>Here's your dashboard</Text>
 
         <View style={styles.gridContainer}>
           {/* Row 1 */}
           <View style={styles.row}>
-            <TouchableOpacity 
-              style={styles.gridCard}
-              onPress={() => handleNavigation('AppointmentsScreen')}
-            >
+            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('AppointmentsScreen')}>
               <Text style={styles.cardIcon}>📅</Text>
               <Text style={styles.gridCardTitle}>Show{'\n'}Appointments</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.gridCard}
-              onPress={() => handleNavigation('ManagePrescriptionsScreen')}
-            >
+
+            {/* ✅ CHANGED: Now navigates to PatientsListScreen */}
+            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('PatientsListScreen')}>
               <Text style={styles.cardIcon}>💊</Text>
               <Text style={styles.gridCardTitle}>Manage{'\n'}Prescriptions</Text>
             </TouchableOpacity>
@@ -129,18 +118,12 @@ const DoctorPortal: React.FC = () => {
 
           {/* Row 2 */}
           <View style={styles.row}>
-            <TouchableOpacity 
-              style={styles.gridCard}
-              onPress={() => handleNavigation('AnalyticsScreen')}
-            >
+            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('AnalyticsScreen')}>
               <Text style={styles.cardIcon}>📊</Text>
               <Text style={styles.gridCardTitle}>View{'\n'}Analytics</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.gridCard}
-              onPress={() => handleNavigation('AIChatbot')}
-            >
+            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('AIChatbot')}>
               <Text style={styles.cardIcon}>🤖</Text>
               <Text style={styles.gridCardTitle}>Enable AI{'\n'}Chatbot</Text>
             </TouchableOpacity>
