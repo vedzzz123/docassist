@@ -18,6 +18,7 @@ import DoctorPage from './DoctorPortal.tsx';
 import Articles from "./Articles.tsx";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import DoctorUploadPrescriptionScreen from './DoctorUploadPrescriptionScreen';
 import 'react-native-url-polyfill/auto';
 import { Session } from '@supabase/supabase-js';
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
@@ -133,7 +134,13 @@ const App = () => {
             <Stack.Screen name="PatientsListScreen" component={PatientsListScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PatientFilesScreen" component={PatientFilesScreen} options={{ headerShown: false }} />
             <Stack.Screen name="ImageViewerScreen" component={ImageViewerScreen} options={{ headerShown: false }} />
-</>       
+            <Stack.Screen 
+              name="DoctorUploadPrescriptionScreen" 
+              component={DoctorUploadPrescriptionScreen} 
+              options={{ headerShown: false }} 
+            />
+
+</>         
         ) : (
           // Normal user screens
           <>

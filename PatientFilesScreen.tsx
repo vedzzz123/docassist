@@ -3,86 +3,106 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
   Alert,
-  Image,
-  Dimensions,
+  ScrollView,
+  Linking,
 } from 'react-native';
 import { supabase } from './App';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-// ✅ ADD THESE TYPE DEFINITIONS
 interface PrescriptionFile {
-  id: number;
+  id: string;
   file_name: string;
   file_url: string;
   created_at: string;
+  uploaded_by: 'patient' | 'doctor';
+  notes?: string;
+  doctor_name?: string;
 }
 
-// ✅ Fix route params typing
 interface RouteParams {
   userId: string;
   patientName: string;
 }
 
-const { width } = Dimensions.get('window');
-const numColumns = 2;
-const imageSize = (width - 48) / numColumns;
-
 const PatientFilesScreen = () => {
   const [files, setFiles] = useState<PrescriptionFile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const navigation = useNavigation<any>(); // ✅ Add <any>
-  const route = useRoute<any>(); // ✅ Add <any>
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   
-  // ✅ Fix the destructuring
   const { userId, patientName } = route.params as RouteParams;
 
   useEffect(() => {
-    fetchPatientFiles();
+    fetchAllFiles();
   }, []);
 
-  const fetchPatientFiles = async () => {
+  const fetchAllFiles = async () => {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
+      // Fetch patient uploads
+      const { data: patientFiles, error: patientError } = await supabase
         .from('prescriptions')
         .select('id, file_name, file_url, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching files:', error);
-        Alert.alert('Error', 'Failed to load files');
-        return;
+      if (patientError) {
+        console.error('Error fetching patient files:', patientError);
       }
 
-      setFiles(data || []);
+      // Fetch doctor uploads
+      const { data: doctorFiles, error: doctorError } = await supabase
+        .from('doctor_prescriptions')
+        .select('id, file_name, file_url, uploaded_at, notes, doctor_name')
+        .eq('patient_user_id', userId)
+        .order('uploaded_at', { ascending: false });
 
+      if (doctorError) {
+        console.error('Error fetching doctor files:', doctorError);
+      }
+
+      // Combine both arrays
+      const combinedFiles: PrescriptionFile[] = [
+        ...(patientFiles || []).map(file => ({
+          id: file.id.toString(),
+          file_name: file.file_name,
+          file_url: file.file_url,
+          created_at: file.created_at,
+          uploaded_by: 'patient' as const,
+        })),
+        ...(doctorFiles || []).map(file => ({
+          id: `doctor-${file.id}`,
+          file_name: file.file_name,
+          file_url: file.file_url,
+          created_at: file.uploaded_at,
+          uploaded_by: 'doctor' as const,
+          notes: file.notes,
+          doctor_name: file.doctor_name,
+        })),
+      ];
+
+      // Sort by date
+      combinedFiles.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setFiles(combinedFiles);
     } catch (error) {
       console.error('Fetch error:', error);
       Alert.alert('Error', 'Something went wrong');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchPatientFiles();
-  };
-
-  const openImageViewer = (file: PrescriptionFile, index: number) => {
-    navigation.navigate('ImageViewerScreen', {
-      files: files,
-      initialIndex: index,
-      patientName: patientName,
+  const openImage = (uri: string) => {
+    Linking.openURL(uri).catch(err => {
+      console.error('Failed to open image:', err);
+      Alert.alert('Error', 'Failed to open image');
     });
   };
 
@@ -90,30 +110,10 @@ const PatientFilesScreen = () => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-GB', {
       day: '2-digit',
-      month: 'short',
+      month: '2-digit',
       year: 'numeric',
     });
   };
-
-  const renderFileCard = ({ item, index }: { item: PrescriptionFile; index: number }) => (
-    <TouchableOpacity
-      style={styles.fileCard}
-      onPress={() => openImageViewer(item, index)}
-      activeOpacity={0.8}
-    >
-      <Image
-        source={{ uri: item.file_url }}
-        style={styles.thumbnail}
-        resizeMode="cover"
-      />
-      <View style={styles.fileInfo}>
-        <Text style={styles.fileName} numberOfLines={1}>
-          {item.file_name}
-        </Text>
-        <Text style={styles.fileDate}>{formatDate(item.created_at)}</Text>
-      </View>
-    </TouchableOpacity>
-  );
 
   if (loading) {
     return (
@@ -126,11 +126,12 @@ const PatientFilesScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-        <View style={styles.headerContent}>
+        <View>
           <Text style={styles.headerTitle}>{patientName}</Text>
           <Text style={styles.headerSubtitle}>
             {files.length} {files.length === 1 ? 'file' : 'files'}
@@ -138,22 +139,69 @@ const PatientFilesScreen = () => {
         </View>
       </View>
 
-      <FlatList
-        data={files}
-        renderItem={renderFileCard}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={numColumns}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
+      <ScrollView contentContainerStyle={styles.content}>
+        {files.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📄</Text>
-            <Text style={styles.emptyText}>No files uploaded</Text>
+            <Text style={styles.emptyText}>No prescriptions uploaded yet</Text>
           </View>
-        }
-      />
+        ) : (
+          files.map((file) => (
+            <View 
+              key={file.id} 
+              style={[
+                styles.fileCard,
+                file.uploaded_by === 'doctor' && styles.doctorCard
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.cardTitleContainer}>
+                  <Text style={styles.fileName} numberOfLines={1}>{file.file_name}</Text>
+                  <Text style={styles.dateText}>{formatDate(file.created_at)}</Text>
+                </View>
+                <View style={[
+                  styles.badge,
+                  file.uploaded_by === 'doctor' ? styles.doctorBadge : styles.patientBadge
+                ]}>
+                  <Text style={styles.badgeText}>
+                    {file.uploaded_by === 'doctor' ? 'Doctor' : 'Patient'}
+                  </Text>
+                </View>
+              </View>
+
+              {file.notes && (
+                <View style={styles.notesContainer}>
+                  <Text style={styles.notesLabel}>Notes:</Text>
+                  <Text style={styles.notesText}>{file.notes}</Text>
+                </View>
+              )}
+
+              {file.doctor_name && (
+                <Text style={styles.doctorNameText}>Uploaded by: {file.doctor_name}</Text>
+              )}
+
+              <View style={styles.fileActions}>
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  onPress={() => openImage(file.file_url)}
+                >
+                  <Text style={styles.actionText}>View</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fabButton}
+        onPress={() => navigation.navigate('DoctorUploadPrescriptionScreen', {
+          userId: userId,
+          patientName: patientName,
+        })}
+      >
+        <Text style={styles.fabIcon}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -161,17 +209,17 @@ const PatientFilesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f7fa',
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f4f7fa',
+    backgroundColor: '#f8f9fa',
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
+    fontSize: 15,
     color: '#666',
   },
   header: {
@@ -189,12 +237,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '300',
   },
-  headerContent: {
-    flex: 1,
-  },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#fff',
   },
   headerSubtitle: {
@@ -202,52 +247,134 @@ const styles = StyleSheet.create({
     color: '#e0e0e0',
     marginTop: 2,
   },
-  listContainer: {
-    padding: 16,
-  },
-  fileCard: {
-    width: imageSize,
-    marginBottom: 16,
-    marginHorizontal: 8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    overflow: 'hidden',
-  },
-  thumbnail: {
-    width: '100%',
-    height: imageSize,
-    backgroundColor: '#f0f0f0',
-  },
-  fileInfo: {
-    padding: 12,
-  },
-  fileName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  fileDate: {
-    fontSize: 12,
-    color: '#666',
+  content: {
+    padding: 20,
+    paddingBottom: 100,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    marginTop: 60,
   },
   emptyText: {
-    fontSize: 16,
+    textAlign: 'center',
+    fontSize: 15,
     color: '#999',
+  },
+  fileCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  doctorCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#27ae60',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  cardTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  fileName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  dateText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  doctorBadge: {
+    backgroundColor: '#27ae60',
+  },
+  patientBadge: {
+    backgroundColor: '#3498db',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  notesContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 6,
+  },
+  notesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  notesText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  doctorNameText: {
+    fontSize: 13,
+    color: '#27ae60',
+    fontWeight: '500',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  fileActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  actionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+  },
+  actionText: {
+    color: '#0057b3',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  fabButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#316ad2ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  fabIcon: {
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: '300',
   },
 });
 
