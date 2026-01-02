@@ -21,6 +21,7 @@
     "@supabase/supabase-js": "^2.57.0",
     "axios": "^1.11.0",
     "base64-arraybuffer": "^1.0.2",
+    "expo-linear-gradient": "~14.1.5",
     "maps": "^0.3.3",
     "moment": "^2.30.1",
     "native": "^0.2.0",

@@ -2,399 +2,685 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   TextInput,
-  Dimensions,
-  Alert,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
   ActivityIndicator,
+  Alert,
   Linking,
+  Image,
+  Dimensions,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { Session } from '@supabase/supabase-js';
+import { useRoute } from '@react-navigation/native';
+import { supabase } from './App';
 
-const screenWidth = Dimensions.get('window').width;
+const { width } = Dimensions.get('window');
 
 interface Article {
   id: string;
   title: string;
-  summary: string;
-  category: string;
-  readTime: string;
-  date: string;
+  description: string;
+  content: string;
+  source_name: string;
+  author: string | null;
   url: string;
-  author: string;
+  image_url: string | null;
+  published_at: string;
+  keywords: string[];
 }
 
 interface RouteParams {
-  session: Session;
+  session: any;
 }
 
 const Articles = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [articles, setArticles] = useState<Article[]>([]);
   const [filteredArticles, setFilteredArticles] = useState<Article[]>([]);
+  const [recommendations, setRecommendations] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation<any>();
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'foryou'>('all'); // Tab state
+  
   const route = useRoute();
   const { session } = route.params as RouteParams;
 
-  const categories = [
-    'All',
-    'General Health',
-    'Nutrition',
-    'Exercise',
-    'Mental Health',
-    'Preventive Care',
-    'Medical Breakthroughs',
-    'Public Health',
-  ];
+  // Fetch articles from Supabase
+  const fetchArticles = async () => {
+    try {
+      setLoading(true);
 
-  const mockArticles: Article[] = [
-    {
-      id: '1',
-      title: "Kerala doctors treat world's first dual case of amoebic meningitis, fungal infection",
-      summary:
-        "Doctors in Kerala successfully treated a rare dual infection of amoebic meningitis and fungal infection in a teenager, marking a global medical milestone.",
-      category: 'Medical Breakthroughs',
-      readTime: '8 min read',
-      date: '2025-09-12',
-      author: 'Economic Times Health',
-      url: 'https://health.economictimes.indiatimes.com/news/industry/kerala-achieves-medical-milestone-worlds-first-dual-treatment-of-amoebic-meningitis-and-fungal-infection/123691781?utm_source=top_story&utm_medium=latestNews',
-    },
-    {
-      id: '2',
-      title: 'Hidden viruses in our DNA could be medicine’s next big breakthrough',
-      summary:
-        'Researchers uncovered a viral protein in human DNA that may open new diagnostic and therapeutic options for cancer and autoimmune diseases.',
-      category: 'Medical Breakthroughs',
-      readTime: '6 min read',
-      date: '2025-09-10',
-      author: 'ScienceDaily',
-      url: 'https://www.sciencedaily.com/releases/2025/09/250902085154.htm',
-    },
-    {
-      id: '3',
-      title: 'Study finds cannabis improves sleep where other drugs fail',
-      summary:
-        'A study shows cannabis-based products help insomnia patients improve sleep quality and reduce anxiety over 18 months.',
-      category: 'Mental Health',
-      readTime: '5 min read',
-      date: '2025-09-02',
-      author: 'ScienceDaily',
-      url: 'https://www.sciencedaily.com/releases/2025/09/250901104658.htm',
-    },
-    {
-      id: '4',
-      title: 'Your nose could detect Alzheimer’s years before memory loss',
-      summary:
-        'Researchers found early smell loss in Alzheimer’s is due to immune cell activity destroying nerve connections, enabling earlier diagnosis.',
-      category: 'General Health',
-      readTime: '6 min read',
-      date: '2025-09-01',
-      author: 'ScienceDaily',
-      url: 'https://www.sciencedaily.com/releases/2025/09/250901104643.htm',
-    },
-    {
-      id: '5',
-      title: 'Low-calorie Mediterranean diet and exercise may help lower diabetes risk',
-      summary:
-        'A six-year study found that combining a calorie-restricted Mediterranean diet with exercise significantly lowers type 2 diabetes risk.',
-      category: 'Nutrition',
-      readTime: '7 min read',
-      date: '2025-08-31',
-      author: 'Medical News Today',
-      url: 'https://www.medicalnewstoday.com/articles/low-calorie-mediterranean-diet-and-exercise-may-help-lower-diabetes-risk',
-    },
-    {
-      id: '6',
-      title: 'How to control blood sugar in 14 days without medicine: 8 doctor-recommended tips',
-      summary:
-        'Doctors recommend lifestyle changes like balanced diet and exercise to improve blood sugar levels significantly within two weeks.',
-      category: 'Preventive Care',
-      readTime: '5 min read',
-      date: '2025-08-30',
-      author: 'Times of India',
-      url: 'https://timesofindia.indiatimes.com/life-style/health-fitness/health-news/how-to-control-blood-sugar-in-14-days-without-medicine-8-doctor-recommended-tips/photostory/123677345.cms',
-    },
-    {
-      id: '7',
-      title: 'Management of rickets: the new horizons for the pediatrician',
-      summary:
-        'Modern approaches for managing rickets include early vitamin D supplementation, nutritional interventions, and improved diagnostics for genetic forms.',
-      category: 'Public Health',
-      readTime: '6 min read',
-      date: '2025-08-29',
-      author: 'BioMed Central',
-      url: 'https://jhpn.biomedcentral.com/articles/10.1186/s41043-025-00885-4',
-    },
-    {
-      id: '8',
-      title: 'Plant-based traditional remedies and their role in public health: ethnomedicinal perspectives for a growing population',
-      summary:
-        'Traditional herbal medicines are vital in many communities but require better safety standards and scientific validation.',
-      category: 'Public Health',
-      readTime: '7 min read',
-      date: '2025-08-28',
-      author: 'BioMed Central',
-      url: 'https://jhpn.biomedcentral.com/articles/10.1186/s41043-025-01036-5',
-    },
-    {
-      id: '9',
-      title: 'After narrowing Covid-19 vaccine approval, the FDA says healthy people can still get it. But access might be complicated',
-      summary:
-        'The FDA limited COVID-19 vaccine updates mainly to high-risk groups; healthy people can get it but might face access challenges.',
-      category: 'Preventive Care',
-      readTime: '6 min read',
-      date: '2025-08-27',
-      author: 'CNN Health',
-      url: 'https://edition.cnn.com/2025/08/29/health/covid-vaccine-access-questions-healthy',
-    },
-    {
-      id: '10',
-      title: 'Sugary Drinks Increase Hair Loss Risk, but These Nutrients Can Help',
-      summary:
-        'High sugar intake is linked to hair loss; nutrients like protein, zinc, and omega-3s may help reduce risk.',
-      category: 'Nutrition',
-      readTime: '5 min read',
-      date: '2025-08-26',
-      author: 'Healthline',
-      url: 'https://www.healthline.com/health-news/sugary-drinks-may-increase-hair-loss-risk',
-    },
-    {
-      id: '11',
-      title: 'Cannabis Use Linked to Better Sleep In People With Insomnia',
-      summary:
-        'Medical cannabis may improve sleep duration and reduce anxiety for people with chronic insomnia.',
-      category: 'Mental Health',
-      readTime: '5 min read',
-      date: '2025-08-25',
-      author: 'Healthline',
-      url: 'https://www.healthline.com/health-news/cannabis-use-improves-insomnia-study',
-    },
-    {
-      id: '12',
-      title: "What Is ‘Ozempic Vulva’ and Is It a Real Side Effect of GLP-1 Drugs?",
-      summary:
-        'Some women on GLP-1 drugs report genital irritation, likely due to rapid weight loss or dehydration rather than the drug itself.',
-      category: 'General Health',
-      readTime: '6 min read',
-      date: '2025-08-24',
-      author: 'Healthline',
-      url: 'https://www.healthline.com/health-news/ozempic-vulva-side-effect-glp-1-drugs',
-    },
-    {
-      id: '13',
-      title: 'Is Alkaline or Electrolyte-Infused Water Better Than Tap? What Experts Think',
-      summary:
-        'Experts say tap water is generally best; alkaline and electrolyte waters offer benefits only in special cases.',
-      category: 'Nutrition',
-      readTime: '5 min read',
-      date: '2025-08-23',
-      author: 'Healthline',
-      url: 'https://www.healthline.com/health-news/alkaline-electrolyte-tap-best-water-hydration',
-    },
-  ];
+      const { data, error } = await supabase
+        .from('health_articles')
+        .select('*')
+        .order('published_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error fetching articles:', error);
+        Alert.alert('Error', 'Failed to load articles');
+        return;
+      }
+
+      if (data) {
+        setArticles(data);
+        setFilteredArticles(data);
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      Alert.alert('Error', 'Something went wrong');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Fetch personalized recommendations
+  const fetchRecommendations = async () => {
+    if (!session?.user?.id) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('get-recommendations', {
+        body: { user_id: session.user.id },
+      });
+
+      if (error) {
+        console.error('Recommendations error:', error);
+        return;
+      }
+
+      if (data?.recommendations) {
+        setRecommendations(data.recommendations);
+      }
+    } catch (error) {
+      console.log('Failed to fetch recommendations:', error);
+    }
+  };
+
+  // Calculate reading time
+  const calculateReadTime = (text: string): string => {
+    if (!text) return '5 min';
+    const words = text.split(' ').length;
+    const minutes = Math.ceil(words / 200);
+    return `${minutes} min`;
+  };
+
+  // Format date
+  const formatDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  // Get category color based on keywords
+  const getCategoryColor = (keywords: string[]): string => {
+    if (!keywords || keywords.length === 0) return '#64748B';
+    
+    const keywordStr = keywords.join(' ').toLowerCase();
+    
+    if (keywordStr.includes('heart') || keywordStr.includes('cardiac')) return '#EF4444';
+    if (keywordStr.includes('cancer') || keywordStr.includes('tumor')) return '#8B5CF6';
+    if (keywordStr.includes('diabetes') || keywordStr.includes('blood sugar')) return '#F59E0B';
+    if (keywordStr.includes('mental') || keywordStr.includes('depression')) return '#06B6D4';
+    if (keywordStr.includes('diet') || keywordStr.includes('nutrition')) return '#10B981';
+    if (keywordStr.includes('brain') || keywordStr.includes('alzheimer')) return '#EC4899';
+    if (keywordStr.includes('thyroid') || keywordStr.includes('hormone')) return '#8B5CF6';
+    
+    return '#3B82F6';
+  };
+
+  // Get category name
+  const getCategoryName = (keywords: string[]): string => {
+    if (!keywords || keywords.length === 0) return 'Health';
+    
+    const keywordStr = keywords.join(' ').toLowerCase();
+    
+    if (keywordStr.includes('heart') || keywordStr.includes('cardiac')) return 'Cardiology';
+    if (keywordStr.includes('cancer') || keywordStr.includes('tumor')) return 'Oncology';
+    if (keywordStr.includes('diabetes')) return 'Diabetes';
+    if (keywordStr.includes('mental') || keywordStr.includes('depression')) return 'Mental Health';
+    if (keywordStr.includes('diet') || keywordStr.includes('nutrition')) return 'Nutrition';
+    if (keywordStr.includes('brain') || keywordStr.includes('alzheimer')) return 'Neurology';
+    if (keywordStr.includes('thyroid')) return 'Thyroid';
+    
+    return 'General';
+  };
 
   useEffect(() => {
-    setArticles(mockArticles);
-    setLoading(false);
+    fetchArticles();
+    fetchRecommendations();
   }, []);
 
   useEffect(() => {
-    let filtered = articles;
-
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter(article => article.category === selectedCategory);
-    }
-
-    if (searchQuery.trim() !== '') {
-      filtered = filtered.filter(article =>
-        article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        article.summary.toLowerCase().includes(searchQuery.toLowerCase())
+    if (searchQuery.trim() === '') {
+      setFilteredArticles(articles);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = articles.filter(article =>
+        article.title.toLowerCase().includes(query) ||
+        (article.description && article.description.toLowerCase().includes(query)) ||
+        (article.source_name && article.source_name.toLowerCase().includes(query)) ||
+        (article.keywords && article.keywords.some(kw => kw.toLowerCase().includes(query)))
       );
+      setFilteredArticles(filtered);
+    }
+  }, [searchQuery, articles]);
+
+  const handleArticlePress = async (article: Article) => {
+    if (session?.user?.id) {
+      await supabase.from('user_article_interactions').insert({
+        user_id: session.user.id,
+        article_id: article.id,
+        interaction_type: 'click',
+        created_at: new Date().toISOString(),
+      });
+
+      setTimeout(() => fetchRecommendations(), 1000);
     }
 
-    setFilteredArticles(filtered);
-  }, [searchQuery, selectedCategory, articles]);
-
-  const handleCategoryPress = (category: string) => {
-    setSelectedCategory(category);
-  };
-
-  const handleArticlePress = (url: string) => {
-    Linking.openURL(url).catch(() => {
+    Linking.openURL(article.url).catch(() => {
       Alert.alert('Error', 'Failed to open the article.');
     });
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#fff',
-      paddingTop: 10,
-    },
-    searchBar: {
-      height: 40,
-      marginHorizontal: 16,
-      marginBottom: 10,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      backgroundColor: '#f0f0f0',
-      color: '#000',
-    },
-    categoriesContainer: {
-      flexDirection: 'row',
-      paddingHorizontal: 10,
-      marginBottom: 10,
-      flexWrap: 'wrap',
-    },
-    categoryButton: {
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 20,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: '#000',
-      backgroundColor: '#fff',
-      marginRight: 8,
-    },
-    categoryButtonSelected: {
-      backgroundColor: '#000',
-    },
-    categoryButtonText: {
-      fontSize: 14,
-      color: '#000',
-    },
-    categoryButtonTextSelected: {
-      color: '#fff',
-      fontWeight: 'bold',
-    },
-    articleCard: {
-      backgroundColor: '#fff',
-      borderRadius: 10,
-      padding: 15,
-      marginHorizontal: 16,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: '#000',
-      shadowColor: '#000',
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 3,
-    },
-    articleTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      marginBottom: 6,
-      color: '#000',
-    },
-    articleSummary: {
-      fontSize: 14,
-      marginBottom: 8,
-      color: '#333',
-    },
-    articleMeta: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 6,
-    },
-    articleCategory: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: '#555',
-      fontStyle: 'italic',
-    },
-    articleReadTime: {
-      fontSize: 12,
-      color: '#555',
-    },
-    articleDate: {
-      fontSize: 12,
-      color: '#777',
-      marginBottom: 4,
-    },
-    articleAuthor: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: '#444',
-      marginBottom: 6,
-    },
-    noResultsText: {
-      textAlign: 'center',
-      marginTop: 40,
-      fontSize: 16,
-      color: '#666',
-    },
-  });
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchArticles();
+    fetchRecommendations();
+  };
+
+  // Featured Article Card (Hero)
+  const renderFeaturedArticle = ({ item }: { item: Article }) => (
+    <TouchableOpacity
+      style={styles.featuredCard}
+      onPress={() => handleArticlePress(item)}
+      activeOpacity={0.95}
+    >
+      {item.image_url ? (
+        <Image 
+          source={{ uri: item.image_url }} 
+          style={styles.featuredImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.featuredImagePlaceholder, { backgroundColor: getCategoryColor(item.keywords) }]}>
+          <Text style={styles.placeholderIcon}>📰</Text>
+        </View>
+      )}
+      
+      <View style={styles.featuredOverlay}>
+        <View style={styles.featuredContent}>
+          <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.keywords) }]}>
+            <Text style={styles.categoryText}>{getCategoryName(item.keywords)}</Text>
+          </View>
+          
+          <Text style={styles.featuredTitle} numberOfLines={3}>
+            {item.title}
+          </Text>
+          
+          <View style={styles.featuredMeta}>
+            <View style={styles.metaItem}>
+              <Text style={styles.metaIcon}>📖</Text>
+              <Text style={styles.metaText}>{calculateReadTime(item.description || item.content || '')}</Text>
+            </View>
+            <View style={styles.metaDivider} />
+            <View style={styles.metaItem}>
+              <Text style={styles.metaIcon}>📅</Text>
+              <Text style={styles.metaText}>{formatDate(item.published_at)}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Regular Article Card
+  const renderArticle = ({ item, index }: { item: Article; index: number }) => {
+    // Only show featured card in "All Articles" tab
+    if (index === 0 && activeTab === 'all') {
+      return renderFeaturedArticle({ item });
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.articleCard}
+        onPress={() => handleArticlePress(item)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.articleContent}>
+          <View style={styles.articleLeft}>
+            <View style={styles.categoryContainer}>
+              <View style={[styles.categoryDot, { backgroundColor: getCategoryColor(item.keywords) }]} />
+              <Text style={[styles.categoryLabel, { color: getCategoryColor(item.keywords) }]}>
+                {getCategoryName(item.keywords)}
+              </Text>
+            </View>
+            
+            <Text style={styles.articleTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            
+            {item.description && (
+              <Text style={styles.articleDescription} numberOfLines={2}>
+                {item.description}
+              </Text>
+            )}
+            
+            <View style={styles.articleFooter}>
+              <Text style={styles.sourceText} numberOfLines={1}>{item.source_name}</Text>
+              <Text style={styles.dotSeparator}>•</Text>
+              <Text style={styles.dateText}>{formatDate(item.published_at)}</Text>
+            </View>
+          </View>
+          
+          {item.image_url && (
+            <Image 
+              source={{ uri: item.image_url }} 
+              style={styles.articleThumbnail}
+              resizeMode="cover"
+            />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Get data based on active tab
+  const getDisplayData = () => {
+    if (activeTab === 'foryou') {
+      return searchQuery.trim() === '' ? recommendations : recommendations.filter(article =>
+        article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (article.description && article.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+    return filteredArticles;
+  };
+
+  const displayData = getDisplayData();
 
   return (
     <View style={styles.container}>
-      <TextInput
-        placeholder="Search articles..."
-        placeholderTextColor="#888"
-        style={styles.searchBar}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesContainer}
-      >
-        {categories.map((category, index) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              selectedCategory === category && styles.categoryButtonSelected,
-              index === categories.length - 1 && { marginRight: 0 },
-            ]}
-            onPress={() => handleCategoryPress(category)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.categoryButtonText,
-                selectedCategory === category && styles.categoryButtonTextSelected,
-              ]}
-            >
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#000" style={{ marginTop: 20 }} />
-      ) : filteredArticles.length === 0 ? (
-        <Text style={styles.noResultsText}>No articles found.</Text>
-      ) : (
-        <ScrollView>
-          {filteredArticles.map(article => (
-            <TouchableOpacity
-              key={article.id}
-              style={styles.articleCard}
-              onPress={() => handleArticlePress(article.url)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.articleTitle}>{article.title}</Text>
-              <Text style={styles.articleSummary}>{article.summary}</Text>
-              <View style={styles.articleMeta}>
-                <Text style={styles.articleCategory}>{article.category}</Text>
-                <Text style={styles.articleReadTime}>{article.readTime}</Text>
-              </View>
-              <Text style={styles.articleDate}>{article.date}</Text>
-              <Text style={styles.articleAuthor}>By {article.author}</Text>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputWrapper}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchBar}
+            placeholder="Search health topics..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+              <Text style={styles.clearIcon}>✕</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
+        </View>
+      </View>
+
+      {/* Tab Switcher */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+          onPress={() => setActiveTab('all')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
+            All Articles
+          </Text>
+          {activeTab === 'all' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'foryou' && styles.activeTab]}
+          onPress={() => setActiveTab('foryou')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabContent}>
+            <Text style={[styles.tabText, activeTab === 'foryou' && styles.activeTabText]}>
+              For You
+            </Text>
+            <Text style={styles.tabEmoji}></Text>
+          </View>
+          {activeTab === 'foryou' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      {loading && articles.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+          <Text style={styles.loadingText}>Loading articles...</Text>
+        </View>
+      ) : displayData.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>
+            {activeTab === 'foryou' ? '🎯' : '📭'}
+          </Text>
+          <Text style={styles.emptyTitle}>
+            {activeTab === 'foryou' ? 'No Recommendations Yet' : 'No Articles Found'}
+          </Text>
+          <Text style={styles.emptyText}>
+            {activeTab === 'foryou' 
+              ? 'Start reading articles to get personalized recommendations'
+              : searchQuery 
+                ? 'Try searching with different keywords' 
+                : 'Pull down to refresh'}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={displayData}
+          renderItem={renderArticle}
+          keyExtractor={(item) => `${activeTab}-${item.id}`}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
       )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  
+  // Search Bar
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 10,
+  },
+  searchBar: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0F172A',
+    fontWeight: '400',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  clearIcon: {
+    fontSize: 18,
+    color: '#94A3B8',
+  },
+
+  // Tab Switcher
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  activeTab: {
+    // Active tab styling handled by indicator
+  },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  activeTabText: {
+    color: '#3B82F6',
+    fontWeight: '700',
+  },
+  tabEmoji: {
+    fontSize: 16,
+    marginLeft: 6,
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: '#3B82F6',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  
+  // Featured Article
+  featuredCard: {
+    height: 320,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  featuredImage: {
+    width: '100%',
+    height: '100%',
+  },
+  featuredImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderIcon: {
+    fontSize: 64,
+  },
+  featuredOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '65%',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  featuredContent: {
+    padding: 20,
+  },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  categoryText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  featuredTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 30,
+    marginBottom: 14,
+  },
+  featuredMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaDivider: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#94A3B8',
+    marginHorizontal: 12,
+  },
+  metaIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  metaText: {
+    fontSize: 13,
+    color: '#E2E8F0',
+    fontWeight: '600',
+  },
+  
+  // Regular Articles
+  listContainer: {
+    paddingBottom: 24,
+    paddingTop: 16,
+  },
+  articleCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  articleContent: {
+    flexDirection: 'row',
+    padding: 16,
+  },
+  articleLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  categoryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  categoryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  articleTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  articleDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 21,
+    marginBottom: 12,
+  },
+  articleFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sourceText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: '600',
+    maxWidth: 120,
+  },
+  dotSeparator: {
+    fontSize: 12,
+    color: '#CBD5E1',
+    marginHorizontal: 8,
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  articleThumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+  },
+  
+  // Loading & Empty
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 15,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 48,
+    paddingTop: 40,
+  },
+  emptyIcon: {
+    fontSize: 72,
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+});
 
 export default Articles;
