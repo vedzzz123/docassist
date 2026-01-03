@@ -134,9 +134,9 @@ const HomePage: React.FC<HomePageProps> = ({ session }) => {
   const styles = getStyles(isDarkMode);
 
   const quickActions = [
-    { icon: '👨‍⚕️', title: 'Book Appointment' },
-    { icon: '🧬', title: 'Book Lab Test' },
-    { icon: '📂', title: 'Upload Prescriptions' },
+    { icon: '👨‍⚕️', title: 'Appointment' },
+    { icon: '🧬', title: 'Lab Test' },
+    { icon: '📂', title: 'Prescriptions' },
     { icon: '📰', title: 'Health Articles' },
   ];
 
@@ -227,11 +227,11 @@ const HomePage: React.FC<HomePageProps> = ({ session }) => {
         </TouchableOpacity>
         <TouchableOpacity style={styles.footerItem} onPress={openChatbot}>
           <Text style={styles.footerIcon}>💬</Text>
-          <Text style={styles.footerText}>AI Chatbot</Text>
+          <Text style={styles.footerText}>Messages</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem}>
-          <Text style={styles.footerIcon}>⋯</Text>
-          <Text style={styles.footerText}>More</Text>
+        <TouchableOpacity style={styles.footerItem} onPress={() => (navigation as any).navigate('ClinicLocation')}>
+          <Text style={styles.footerIcon}>📍</Text>
+          <Text style={styles.footerText}>Location</Text>
         </TouchableOpacity>
       </View>
 

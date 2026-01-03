@@ -26,6 +26,8 @@ import Chatbot from "./Chatbot.tsx";
 import PatientsListScreen from './PatientsListScreen';
 import PatientFilesScreen from './PatientFilesScreen';
 import ImageViewerScreen from './ImageViewerScreen';
+import ClinicLocation from './ClinicLocation.tsx';
+
 
 import RazorpayCheckout from 'react-native-razorpay';
 
@@ -123,6 +125,8 @@ const App = () => {
             <Stack.Screen name="PatientsListScreen" component={PatientsListScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PatientFilesScreen" component={PatientFilesScreen} options={{ headerShown: false }} />
             <Stack.Screen name="ImageViewerScreen" component={ImageViewerScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ClinicLocation" component={ClinicLocation} options={{ headerShown: false }} />
+          
           </>
         ) : isDoctorMode ? (
           // Doctor mode screens
