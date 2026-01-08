@@ -108,20 +108,21 @@ const App = () => {
             <Stack.Screen name="Home">
             {(props) => <HomePage {...props} session={session!} />}
             </Stack.Screen>
-
+            <Stack.Screen name="PrescriptionPage" options={{ title: "Prescriptions" }}>
+              {(props) => <PrescriptionPage {...props} session={session} />}
+            </Stack.Screen>
+            
             <Stack.Screen name="PersonalDetails" component={PersonalDetailsScreen} />
             <Stack.Screen name="SelectDoctor" component={SelectDoctor} />
             <Stack.Screen name="AppointmentReceipt" component={AppointmentReceipt} />
             <Stack.Screen name="PaymentPage" component={PaymentPage} />
-            <Stack.Screen name="LabTest" component={BookLab} />
+            <Stack.Screen name="BookLab" component={BookLab} />
             <Stack.Screen name="LabTests" component={LabTests} />
             <Stack.Screen name="LabDetailsScreen" component={LabDetailsScreen} />
-            <Stack.Screen name="Prescriptions">
-             {(props) => <PrescriptionPage {...props} session={session!} />}
-            </Stack.Screen>
+            <Stack.Screen name="Prescriptions" component={ManagePrescriptionsScreen} />
 
             <Stack.Screen name="AppointmentsScreen" component={AppointmentsScreen} />
-            <Stack.Screen name="ManagePrescriptions" component={ManagePrescriptionsScreen} />
+            
             <Stack.Screen name="Articles" component={Articles} />
             <Stack.Screen name="Chatbot" component={Chatbot} />
             <Stack.Screen name="ClinicLocation" component={ClinicLocation} />

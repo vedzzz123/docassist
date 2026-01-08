@@ -74,7 +74,7 @@ const HomePage: React.FC<HomePageProps> = ({ session }) => {
 
   const handleClick = (title: string) => {
     if (title === 'My Profile') {
-      (navigation as any).navigate('MyProfile');
+      (navigation as any).navigate('PersonalDetails');
     } else if (title === 'Prescriptions') {
       (navigation as any).navigate('PrescriptionPage', { session: session });
     } else if (title === 'Appointment') {
