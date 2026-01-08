@@ -1,16 +1,65 @@
 import React from "react";
+
 // @ts-ignore: no types for react-native-razorpay
 import RazorpayCheckout from 'react-native-razorpay';
 import { supabase } from "./App";
 import { Alert } from 'react-native';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 
-const PaymentPage = ({ navigation }: { navigation: any }) => {
-  
+// UPDATED: Add appointmentId parameter to link alert with appointment
+const createAppointmentAlert = async (
+  doctorName: string,
+  appointmentDate: string,
+  appointmentTime: string,
+  appointmentId: string
+) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('No user logged in');
+      return;
+    }
+
+    const { error } = await supabase.from('alerts').insert({
+      user_id: user.id,
+      alert_type: 'appointment',
+      doctor_name: doctorName,
+      appointment_date: appointmentDate,
+      appointment_time: appointmentTime,
+      appointment_id: appointmentId,
+      is_active: true,
+      notification_sent: false
+    });
+
+    if (error) {
+      console.error('Error creating alert:', error);
+    } else {
+      console.log('✅ Appointment alert created successfully');
+    }
+  } catch (err) {
+    console.error('Failed to create alert:', err);
+  }
+};
+
+const PaymentPage = ({ navigation, route }: { navigation: any; route?: any }) => {
   const handlePayNow = async () => {
+    // DEBUG: Check if doctor/date/time/appointmentId are passed
+    console.log('PAYMENT DEBUG:', {
+      doctor: route?.params?.doctor,
+      date: route?.params?.date,
+      time: route?.params?.time,
+      appointmentId: route?.params?.appointmentId
+    });
+
     try {
-      // Payment details - you can pass these as props or get from route params
-      const appointmentId = "00000000-0000-0000-0000-000000000000"; // Replace with actual ID
+      // ✅ UPDATED: Get appointmentId from route params instead of hardcoded value
+      const appointmentId = route?.params?.appointmentId || route?.params?.appointment_id;
+      
+      if (!appointmentId) {
+        Alert.alert('Error', 'Appointment ID missing. Please try booking again.');
+        return;
+      }
+
       const amountRupees = 600;
       const amountPaise = Math.round(amountRupees * 100);
 
@@ -18,6 +67,7 @@ const PaymentPage = ({ navigation }: { navigation: any }) => {
       const { data: orderData, error: orderErr } = await supabase.functions.invoke('create-order', {
         body: { amountInPaise: amountPaise, appointmentId },
       });
+
       if (orderErr || !orderData?.orderId) {
         Alert.alert('Order error', orderErr?.message || 'Failed to create order');
         return;
@@ -28,7 +78,7 @@ const PaymentPage = ({ navigation }: { navigation: any }) => {
         key: orderData.keyId,
         order_id: orderData.orderId,
         amount: String(orderData.amount), // paise
-        currency: orderData.currency,     // "INR"
+        currency: orderData.currency, // "INR"
         name: 'DocAssist',
         description: `Appointment #${appointmentId}`,
         prefill: {
@@ -52,14 +102,34 @@ const PaymentPage = ({ navigation }: { navigation: any }) => {
           appointmentId,
         },
       });
+
       if (verifyErr || !verifyData?.valid) {
         Alert.alert('Verification failed', verifyErr?.message || 'Please contact support.');
         return;
       }
 
+      // ✅ UPDATED: Create alert after successful payment verification with appointmentId
+      const doctor = route?.params?.doctor;
+      const date = route?.params?.date;
+      const time = route?.params?.time;
+      
+      console.log('Creating alert with:', { doctor, date, time, appointmentId });
+      
+      if (doctor && date && time) {
+        await createAppointmentAlert(
+          doctor?.name || 'Unknown Doctor',
+          date,
+          time,
+          appointmentId // ✅ Now using real appointmentId from route params
+        );
+      } else {
+        console.warn('Cannot create alert - missing doctor/date/time in route params');
+      }
+
       // 4) Success
       Alert.alert('Payment successful', 'Your appointment has been confirmed!');
       navigation.navigate("Home");
+
     } catch (e: any) {
       if (e?.code === 'RN_RAZORPAY_CANCELLED') {
         Alert.alert('Payment cancelled');
@@ -80,35 +150,35 @@ const PaymentPage = ({ navigation }: { navigation: any }) => {
         {/* Preferred Method */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferred Payment Methods</Text>
-          <TouchableOpacity style={styles.card}>
+          <View style={styles.card}>
             <Text style={styles.cardIcon}>🏦</Text>
             <Text style={styles.cardText}>Netbanking - Bank of Baroda</Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Other Methods */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Cards, Netbanking & More</Text>
-
-          <TouchableOpacity style={styles.card}>
+          
+          <View style={styles.card}>
             <Text style={styles.cardIcon}>💳</Text>
             <Text style={styles.cardText}>Card</Text>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.card}>
+          <View style={styles.card}>
             <Text style={styles.cardIcon}>🏛️</Text>
             <Text style={styles.cardText}>Netbanking</Text>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.card}>
+          <View style={styles.card}>
             <Text style={styles.cardIcon}>👛</Text>
             <Text style={styles.cardText}>Wallet</Text>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.card}>
+          <View style={styles.card}>
             <Text style={styles.cardIcon}>📱</Text>
             <Text style={styles.cardText}>UPI</Text>
-          </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 

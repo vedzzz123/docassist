@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
+import { supabase } from './App'; // ✅ ADDED: Import supabase
 
 // TypeScript interfaces
 interface Doctor {
@@ -13,6 +14,7 @@ interface Doctor {
 }
 
 interface AppointmentData {
+  id?: string; // ✅ ADDED: appointment ID
   doctor_name: string;
   appointment_date: string;
   time_slot: string;
@@ -38,7 +40,7 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
   const [selectedDoctorData, setSelectedDoctorData] = React.useState<Doctor | null>(null);
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = React.useState<string | null>(null);
-  const [isDatePickerVisible, setDatePickerVisibility] = React.useState<boolean>(false);
+  const [isDatePickerVisible, setDatePickerVisibility] = React.useState(false);
   const [activeDoctorDatePicker, setActiveDoctorDatePicker] = React.useState<string | null>(null);
 
   const doctors: Doctor[] = [
@@ -53,7 +55,7 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
     {
       id: 'dr_urvi',
       name: 'Dr. Urvi A. Mehta',
-      specialization: 'Cardiologist', 
+      specialization: 'Cardiologist',
       rating: 5.0,
       fee: 1,
       timeSlots: ['10:00', '11:00', '12:00', '13:00', '14:00']
@@ -61,11 +63,11 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
   ];
 
   const formatDate = (date: Date): string => {
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     };
     return date.toLocaleDateString('en-US', options);
   };
@@ -103,40 +105,82 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
     setSelectedTimeSlot(timeSlot);
   };
 
-  const handleBookAppointment = (): void => {
+  // ✅ UPDATED: Now creates appointment in database first
+  const handleBookAppointment = async (): Promise<void> => {
     if (!selectedDoctor || !selectedDoctorData || !selectedDate || !selectedTimeSlot) {
       Alert.alert(
-        'Incomplete Selection', 
+        'Incomplete Selection',
         'Please select doctor, date, and time slot to continue',
         [{ text: 'OK' }]
       );
       return;
     }
 
-    const appointmentData: AppointmentData = {
-      doctor_name: selectedDoctorData.name,
-      appointment_date: formatDateForStorage(selectedDate),
-      time_slot: selectedTimeSlot,
-      cost: selectedDoctorData.fee,
-      payment_mode: 'Razorpay',
-      appointment_status: 'confirmed',
-      doctorSpecialization: selectedDoctorData.specialization,
-      appointmentDateDisplay: formatDate(selectedDate),
-      doctorId: selectedDoctorData.id
-    };
+    try {
+      // ✅ Step 1: Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        Alert.alert('Error', 'Please log in first');
+        return;
+      }
 
-    navigation.navigate('AppointmentReceipt', {
-      appointmentData
-    });
+      // ✅ Step 2: Create appointment in database
+      const { data: newAppointment, error: insertError } = await supabase
+        .from('appointments')
+        .insert({
+          user_id: user.id,
+          doctor_name: selectedDoctorData.name,
+          appointment_date: formatDateForStorage(selectedDate),
+          time_slot: selectedTimeSlot,
+          cost: selectedDoctorData.fee,
+          payment_mode: 'Razorpay',
+          appointment_status: 'pending' // ✅ Changed to 'pending' until payment
+        })
+        .select()
+        .single();
+
+      if (insertError || !newAppointment) {
+        console.error('Error creating appointment:', insertError);
+        Alert.alert('Error', 'Failed to create appointment. Please try again.');
+        return;
+      }
+
+      console.log('✅ Appointment created with ID:', newAppointment.id);
+
+      // ✅ Step 3: Navigate with appointment ID
+      const appointmentData: AppointmentData = {
+        id: newAppointment.id, // ✅ ADDED: Include the appointment ID
+        doctor_name: selectedDoctorData.name,
+        appointment_date: formatDateForStorage(selectedDate),
+        time_slot: selectedTimeSlot,
+        cost: selectedDoctorData.fee,
+        payment_mode: 'Razorpay',
+        appointment_status: 'pending',
+        doctorSpecialization: selectedDoctorData.specialization,
+        appointmentDateDisplay: formatDate(selectedDate),
+        doctorId: selectedDoctorData.id
+      };
+
+      navigation.navigate('AppointmentReceipt', {
+        appointmentData
+      });
+
+    } catch (error) {
+      console.error('Error in handleBookAppointment:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    }
   };
 
-  // Fixed line 133 - properly typed return type
   const renderDoctor = (doctor: Doctor): React.JSX.Element => {
     const isSelected: boolean = selectedDoctor === doctor.name;
     const hasSelectedDate: boolean = isSelected && selectedDate !== null;
-    
+
     return (
-      <View key={doctor.id} style={[styles.doctorCard, isSelected && styles.selectedDoctorCard]}>
+      <View
+        key={doctor.id}
+        style={[styles.doctorCard, isSelected && styles.selectedDoctorCard]}
+      >
         <TouchableOpacity onPress={() => handleSelectDoctor(doctor)} style={styles.doctorHeader}>
           <Text style={styles.doctorName}>{doctor.name}</Text>
           <View style={styles.ratingContainer}>
@@ -149,22 +193,23 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
         <Text style={styles.specialization}>{doctor.specialization}</Text>
         <Text style={styles.fee}>₹{doctor.fee}</Text>
 
-        <TouchableOpacity 
-          style={[
-            styles.dateButton, 
-            hasSelectedDate && styles.selectedDateButton
-          ]} 
+        <TouchableOpacity
           onPress={() => showDatePicker(doctor.id)}
           disabled={!isSelected}
+          style={[
+            styles.dateButton,
+            isSelected && hasSelectedDate && styles.selectedDateButton
+          ]}
         >
-          <Text style={[
-            styles.dateButtonText,
-            hasSelectedDate && styles.selectedDateButtonText
-          ]}>
+          <Text
+            style={[
+              styles.dateButtonText,
+              isSelected && hasSelectedDate && styles.selectedDateButtonText
+            ]}
+          >
             {isSelected && hasSelectedDate && selectedDate
               ? formatDate(selectedDate)
-              : 'Select Date For Appointment'
-            }
+              : 'Select Date For Appointment'}
           </Text>
         </TouchableOpacity>
 
@@ -173,16 +218,18 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
             {doctor.timeSlots.map((slot: string) => (
               <TouchableOpacity
                 key={slot}
+                onPress={() => handleSelectTimeSlot(slot)}
                 style={[
                   styles.timeSlot,
                   selectedTimeSlot === slot && styles.selectedTimeSlot
                 ]}
-                onPress={() => handleSelectTimeSlot(slot)}
               >
-                <Text style={[
-                  styles.timeSlotText,
-                  selectedTimeSlot === slot && styles.selectedTimeSlotText
-                ]}>
+                <Text
+                  style={[
+                    styles.timeSlotText,
+                    selectedTimeSlot === slot && styles.selectedTimeSlotText
+                  ]}
+                >
                   {slot}
                 </Text>
               </TouchableOpacity>
@@ -199,10 +246,8 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}></Text>
+        <Text style={styles.headerTitle}>Select Doctor</Text>
       </View>
-
-      <Text style={styles.title}>Select Doctor</Text>
 
       <ScrollView style={styles.scrollContainer}>
         {doctors.map(renderDoctor)}
@@ -220,7 +265,6 @@ const SelectDoctor: React.FC<SelectDoctorProps> = ({ navigation }) => {
         onConfirm={handleConfirmDate}
         onCancel={hideDatePicker}
         minimumDate={new Date()}
-        maximumDate={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)}
       />
     </View>
   );

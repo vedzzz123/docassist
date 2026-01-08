@@ -14,7 +14,7 @@ import PrescriptionPage from './PrescriptionPage';
 import PersonalDetailsScreen from './PersonalDetailsScreen.tsx';
 import AppointmentsScreen from "./AppointmentsScreen.tsx";
 import ManagePrescriptionsScreen from "./ManagePrescriptionsScreen.tsx";
-import DoctorPage from './DoctorPortal.tsx'; 
+import DoctorPage from './DoctorPortal.tsx';
 import Articles from "./Articles.tsx";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
@@ -27,8 +27,8 @@ import PatientsListScreen from './PatientsListScreen';
 import PatientFilesScreen from './PatientFilesScreen';
 import ImageViewerScreen from './ImageViewerScreen';
 import ClinicLocation from './ClinicLocation.tsx';
-
-
+import Alerts from "./Alerts.tsx";
+import MyProfile from "./MyProfile.tsx";
 import RazorpayCheckout from 'react-native-razorpay';
 
 GoogleSignin.configure({
@@ -50,13 +50,13 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 
 const Stack = createNativeStackNavigator();
 
-// ✅ Helper function to check if user has completed personal details
+// Helper function to check if user has completed personal details
 const checkUserDetailsCompletion = async (userId: string) => {
   try {
     const { data, error } = await supabase
       .from("user_details")
-      .select("uid")           // Primary key column name
-      .eq("user_id", userId)   // Foreign key column name
+      .select("uid")
+      .eq("user_id", userId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -64,7 +64,7 @@ const checkUserDetailsCompletion = async (userId: string) => {
       return false;
     }
 
-    return !!data; // Returns true if data exists, false otherwise
+    return !!data;
   } catch (error) {
     console.error("Error in checkUserDetailsCompletion:", error);
     return false;
@@ -72,9 +72,9 @@ const checkUserDetailsCompletion = async (userId: string) => {
 };
 
 const App = () => {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(null); // ✅ FIXED TypeScript error
   const [loading, setLoading] = useState(true);
-  const [isDoctorMode, setIsDoctorMode] = useState(false); // Track doctor mode
+  const [isDoctorMode, setIsDoctorMode] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -92,67 +92,58 @@ const App = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FA' }}>
         <ActivityIndicator size="large" color="#0057b3" />
+        <Text style={{ marginTop: 10, fontSize: 16, color: '#666' }}>Loading...</Text>
       </View>
     );
   }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session && session.user ? (
           <>
-            <Stack.Screen name="Home" options={{ headerShown: false }}>
-              {(props) => <HomePage {...props} session={session} />}
+            {/* User authenticated screens */}
+            <Stack.Screen name="Home">
+            {(props) => <HomePage {...props} session={session!} />}
             </Stack.Screen>
-            <Stack.Screen name="PrescriptionPage" options={{ title: "Prescriptions" }}>
-              {(props) => <PrescriptionPage {...props} session={session} />}
-            </Stack.Screen>
-            <Stack.Screen name="PersonalDetails" component={PersonalDetailsScreen} options={{ title: "Complete Your Profile" }} />
-            <Stack.Screen 
-            name="AppointmentReceipt" 
-            component={AppointmentReceipt}
-            options={{ headerShown: false }}/>
 
-            <Stack.Screen name="PaymentPage" component={PaymentPage}/>
-            <Stack.Screen name="BookLab" component={BookLab}/>
-            <Stack.Screen name="LabTests" component={LabTests}/>
-            <Stack.Screen name="LabDetailsScreen" component={LabDetailsScreen}/>
+            <Stack.Screen name="PersonalDetails" component={PersonalDetailsScreen} />
             <Stack.Screen name="SelectDoctor" component={SelectDoctor} />
-            <Stack.Screen name="Chatbot" component={Chatbot} />
+            <Stack.Screen name="AppointmentReceipt" component={AppointmentReceipt} />
+            <Stack.Screen name="PaymentPage" component={PaymentPage} />
+            <Stack.Screen name="LabTest" component={BookLab} />
+            <Stack.Screen name="LabTests" component={LabTests} />
+            <Stack.Screen name="LabDetailsScreen" component={LabDetailsScreen} />
+            <Stack.Screen name="Prescriptions">
+             {(props) => <PrescriptionPage {...props} session={session!} />}
+            </Stack.Screen>
+
+            <Stack.Screen name="AppointmentsScreen" component={AppointmentsScreen} />
+            <Stack.Screen name="ManagePrescriptions" component={ManagePrescriptionsScreen} />
             <Stack.Screen name="Articles" component={Articles} />
-            <Stack.Screen name="PatientsListScreen" component={PatientsListScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="PatientFilesScreen" component={PatientFilesScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="ImageViewerScreen" component={ImageViewerScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="ClinicLocation" component={ClinicLocation} options={{ headerShown: false }} />
-          
+            <Stack.Screen name="Chatbot" component={Chatbot} />
+            <Stack.Screen name="ClinicLocation" component={ClinicLocation} />
+            <Stack.Screen name="Alerts" component={Alerts} />
+            <Stack.Screen name="MyProfile" component={MyProfile} />
           </>
         ) : isDoctorMode ? (
-          // Doctor mode screens
           <>
-            <Stack.Screen name="DoctorPage" component={DoctorPage} options={{ headerShown: false }} />
-            <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="AppointmentsScreen" component={AppointmentsScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="ManagePrescriptionsScreen" component={ManagePrescriptionsScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="PatientsListScreen" component={PatientsListScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="PatientFilesScreen" component={PatientFilesScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="ImageViewerScreen" component={ImageViewerScreen} options={{ headerShown: false }} />
-            <Stack.Screen 
-              name="DoctorUploadPrescriptionScreen" 
-              component={DoctorUploadPrescriptionScreen} 
-              options={{ headerShown: false }} 
-            />
-
-</>         
+            {/* Doctor mode screens */}
+            <Stack.Screen name="DoctorPage" component={DoctorPage} />
+            <Stack.Screen name="DoctorUploadPrescription" component={DoctorUploadPrescriptionScreen} />
+            <Stack.Screen name="PatientsList" component={PatientsListScreen} />
+            <Stack.Screen name="PatientFiles" component={PatientFilesScreen} />
+            <Stack.Screen name="ImageViewer" component={ImageViewerScreen} />
+          </>
         ) : (
-          // Normal user screens
           <>
-            <Stack.Screen name="SignIn" options={{ headerShown: false }}>
+            {/* Authentication screens */}
+            <Stack.Screen name="SignIn">
               {(props) => <SignInScreen {...props} setIsDoctorMode={setIsDoctorMode} />}
             </Stack.Screen>
-            <Stack.Screen name="SignUp" component={SignUpScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="PersonalDetails" component={PersonalDetailsScreen} options={{ title: "Complete Your Profile" }} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
           </>
         )}
       </Stack.Navigator>
@@ -182,25 +173,21 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
       return;
     }
 
-    // ✅ CHECK FOR STATIC DOCTOR CREDENTIALS FIRST
+    // Check for static doctor credentials first
     if (email === "arvindmehta123@gmail.com" && password === "arvind123") {
       try {
         setLoading(true);
         setErrorMessage("");
-        
         console.log("🩺 Doctor login detected - navigating to DoctorPage");
-        
-        // Set doctor mode and navigate
+
         if (setIsDoctorMode) {
           setIsDoctorMode(true);
         }
-        
-        // Small delay to ensure state update
+
         setTimeout(() => {
           navigation.navigate("DoctorPage");
         }, 100);
-        
-        return; // Exit early, don't continue with normal auth
+        return;
       } catch (error) {
         console.error("Error navigating to DoctorPage:", error);
         setErrorMessage("Navigation error occurred.");
@@ -210,11 +197,10 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
       return;
     }
 
-    // ✅ CONTINUE WITH NORMAL SUPABASE AUTHENTICATION FOR ALL OTHER USERS
+    // Continue with normal Supabase authentication for all other users
     try {
       setLoading(true);
       setErrorMessage("");
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
@@ -228,7 +214,7 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
       if (data?.session) {
         console.log("✅ Email sign-in successful:", data.session.user.email);
         
-        // ✅ Check if user has completed personal details
+        // Check if user has completed personal details
         const hasPersonalDetails = await checkUserDetailsCompletion(data.session.user.id);
         
         if (hasPersonalDetails) {
@@ -236,7 +222,8 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
           // Session management will handle navigation to Home automatically
         } else {
           console.log("📄 New user or incomplete profile - needs personal details");
-          navigation.navigate("PersonalDetails");
+          navigation.navigate('MyProfile')  // ✅ Shows saved profile data
+
         }
       }
     } catch (error) {
@@ -247,21 +234,20 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
     }
   };
 
-  // ✅ ENHANCED: Google sign-in with complete user flow checking
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
       setErrorMessage("");
-      
+
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       await GoogleSignin.signOut();
       const userInfo = await GoogleSignin.signIn();
-      
-      // ✅ FIXED: Safe access to user email
+
       const userEmail = (userInfo as any).user?.email || "No email";
       console.log("Google User Info:", userEmail);
 
       const { idToken } = await GoogleSignin.getTokens();
+
       if (!idToken) {
         throw new Error("No ID token received from Google");
       }
@@ -286,7 +272,7 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
         } else {
           console.log("📄 New user or incomplete profile - needs personal details");
           setTimeout(() => {
-            navigation.navigate("PersonalDetails");
+            navigation.navigate('MyProfile')  // ✅ Shows saved profile data
           }, 1000);
         }
       }
@@ -343,7 +329,8 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
 
   return (
     <View style={styles.container}>
-      <Text style={styles.signupLink}>Let's Get you in</Text>
+      <Text style={styles.title}>Let's Get you in</Text>
+
       {loading ? <ActivityIndicator size="large" color="#007BFF" /> : null}
 
       {errorMessage && (
@@ -355,56 +342,58 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor="#999"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
-        editable={!loading}
       />
+
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor="#999"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        editable={!loading}
       />
 
-      <TouchableOpacity 
-        style={[styles.signInButton, loading && styles.disabledButton]} 
+      <TouchableOpacity
+        style={[styles.signInButton, loading && styles.disabledButton]}
         onPress={handleSignIn}
         disabled={loading}
       >
         <Text style={styles.signInText}>Log In</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.disabledButton]} 
+      <TouchableOpacity
+        style={[styles.button, loading && styles.disabledButton]}
         onPress={signInWithGoogle}
         disabled={loading}
       >
+        <Image source={require('./assets/google.png')} style={styles.iconImage} />
         <Text style={styles.buttonText}>Continue with Google</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.disabledButton]} 
+      <TouchableOpacity
+        style={[styles.button, loading && styles.disabledButton]}
         onPress={handleOTPSignIn}
         disabled={loading}
       >
         <Text style={styles.buttonText}>Continue with OTP</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[styles.button, styles.disabledButton]} 
-        disabled={true}
+      <TouchableOpacity
+        style={[styles.button, loading && styles.disabledButton]}
+        disabled={loading}
       >
         <Text style={styles.buttonText}>Continue with Yahoo</Text>
       </TouchableOpacity>
 
       <Text style={styles.signupText}>
         Don't have an account?
-        <Text 
-          style={styles.signupLink} 
+        <Text
+          style={styles.signupLink}
           onPress={() => !loading && navigation.navigate("SignUp")}
         >
           {" "}Sign up
@@ -427,6 +416,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
+    color: "#333",
   },
   input: {
     width: "90%",
@@ -437,6 +427,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: "#000",
     textAlign: "left",
+    backgroundColor: "#fff",
   },
   signInButton: {
     width: "90%",
@@ -487,9 +478,6 @@ const styles = StyleSheet.create({
   signupLink: {
     color: "#1877F2",
     fontWeight: "bold",
-    fontSize: 24,
-    marginBottom: 20,
-    textAlign: "center",
   },
   errorMessageBox: {
     width: "90%",

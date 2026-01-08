@@ -1,8 +1,39 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+
 // @ts-ignore: no types for react-native-razorpay
 import RazorpayCheckout from 'react-native-razorpay';
 import { supabase } from './App';
+
+// ✅ NEW: Function to create appointment alert
+const createAppointmentAlert = async (appointmentData: any) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('No user logged in');
+      return;
+    }
+
+    const { error } = await supabase.from('alerts').insert({
+      user_id: user.id,
+      alert_type: 'appointment',
+      doctor_name: appointmentData.doctor_name,
+      appointment_date: appointmentData.appointment_date,
+      appointment_time: appointmentData.time_slot,
+      appointment_id: appointmentData.id,
+      is_active: true,
+      notification_sent: false
+    });
+
+    if (error) {
+      console.error('Error creating appointment alert:', error);
+    } else {
+      console.log('✅ Appointment alert created successfully');
+    }
+  } catch (err) {
+    console.error('Failed to create appointment alert:', err);
+  }
+};
 
 const AppointmentReceipt = ({ navigation, route }: any) => {
   const { appointmentData } = route.params || {};
@@ -18,7 +49,6 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
 
       // Step 1: Get user and their details
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
       if (userError || !user) {
         Alert.alert('Authentication Error', 'Please log in first');
         return;
@@ -38,9 +68,9 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
 
       // Step 3: Create order via Edge Function
       const { data: orderData, error: orderErr } = await supabase.functions.invoke('create-order', {
-        body: { 
+        body: {
           amountInPaise: appointmentData.cost * 100, // Convert to paise
-          appointmentId: appointmentData
+          appointmentId: appointmentData.id
         },
       });
 
@@ -65,8 +95,8 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
           contact: `+91${userDetails.phone_num}`, // Real phone number from database
           name: `${userDetails.name} ${userDetails.surname}`
         },
-        theme: { 
-          color: '#1976D2' 
+        theme: {
+          color: '#1976D2'
         }
       };
 
@@ -78,7 +108,6 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
 
       // Step 5: Open Razorpay Checkout
       const paymentResult = await RazorpayCheckout.open(options);
-      
       console.log('✅ Payment successful:', paymentResult);
 
       // Step 6: Verify payment on server
@@ -87,7 +116,7 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
           razorpay_order_id: paymentResult.razorpay_order_id,
           razorpay_payment_id: paymentResult.razorpay_payment_id,
           razorpay_signature: paymentResult.razorpay_signature,
-          appointmentId: appointmentData,
+          appointmentId: appointmentData.id,
         },
       });
 
@@ -95,6 +124,10 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
         Alert.alert('Payment Verification Failed', 'Please contact support.');
         return;
       }
+
+      // ✅ NEW: Step 6.5: Create appointment alert after successful verification
+      console.log('✅ Payment verified, creating alert...');
+      await createAppointmentAlert(appointmentData);
 
       // Step 7: Success!
       Alert.alert(
@@ -105,7 +138,6 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
 
     } catch (error: any) {
       console.error('Payment error:', error);
-      
       if (error?.code === 'RN_RAZORPAY_CANCELLED') {
         Alert.alert('Payment Cancelled', 'You can try again later.');
       } else {
@@ -144,18 +176,22 @@ const AppointmentReceipt = ({ navigation, route }: any) => {
           <Text style={styles.label}>Doctor:</Text>
           <Text style={styles.value}>{appointmentData.doctor_name}</Text>
         </View>
+
         <View style={styles.row}>
           <Text style={styles.label}>Specialization:</Text>
           <Text style={styles.value}>{appointmentData.doctorSpecialization}</Text>
         </View>
+
         <View style={styles.row}>
           <Text style={styles.label}>Date:</Text>
           <Text style={styles.value}>{appointmentData.appointmentDateDisplay}</Text>
         </View>
+
         <View style={styles.row}>
           <Text style={styles.label}>Time:</Text>
           <Text style={styles.value}>{appointmentData.time_slot}</Text>
         </View>
+
         <View style={styles.row}>
           <Text style={styles.label}>Fees:</Text>
           <Text style={styles.value}>₹{appointmentData.cost}</Text>

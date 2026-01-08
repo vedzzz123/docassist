@@ -22,7 +22,9 @@ const screenWidth = Dimensions.get('window').width;
 
 interface HomePageProps {
   session: Session;
+  navigation?: any;
 }
+
 
 const HomePage: React.FC<HomePageProps> = ({ session }) => {
   const [theme, setTheme] = useState('light');
@@ -72,7 +74,7 @@ const HomePage: React.FC<HomePageProps> = ({ session }) => {
 
   const handleClick = (title: string) => {
     if (title === 'My Profile') {
-      (navigation as any).navigate('PersonalDetails');
+      (navigation as any).navigate('MyProfile');
     } else if (title === 'Prescriptions') {
       (navigation as any).navigate('PrescriptionPage', { session: session });
     } else if (title === 'Appointment') {
@@ -221,7 +223,7 @@ const HomePage: React.FC<HomePageProps> = ({ session }) => {
           <Text style={styles.footerIcon}>🏠</Text>
           <Text style={styles.footerText}>Actions</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem}>
+        <TouchableOpacity style={styles.footerItem} onPress={() => (navigation as any).navigate('Alerts')}>
           <Text style={styles.footerIcon}>🚨</Text>
           <Text style={styles.footerText}>Alerts</Text>
         </TouchableOpacity>
