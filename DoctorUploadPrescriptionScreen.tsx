@@ -19,10 +19,9 @@ const DoctorUploadPrescriptionScreen = () => {
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [notes, setNotes] = useState('');
   const [uploading, setUploading] = useState(false);
-  const navigation = useNavigation<any>();
-  const route = useRoute<any>();
-  
-  const { userId, patientName } = route.params;
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { userId, patientName } = route.params as any;
 
   const pickFromCamera = () => {
     launchCamera(
@@ -30,7 +29,7 @@ const DoctorUploadPrescriptionScreen = () => {
         mediaType: 'photo',
         quality: 0.8,
         saveToPhotos: true,
-        includeBase64: true, // ✅ KEY: Get base64
+        includeBase64: true,
       },
       (response) => {
         if (response.didCancel) {
@@ -49,7 +48,7 @@ const DoctorUploadPrescriptionScreen = () => {
       {
         mediaType: 'photo',
         quality: 0.8,
-        includeBase64: true, // ✅ KEY: Get base64
+        includeBase64: true,
       },
       (response) => {
         if (response.didCancel) {
@@ -71,20 +70,15 @@ const DoctorUploadPrescriptionScreen = () => {
 
     try {
       setUploading(true);
-
       console.log('✅ Starting upload for patient:', patientName);
 
-      // Create filename
       const fileExt = selectedImage.fileName?.split('.').pop() || 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
-
       console.log('📁 Uploading to path:', filePath);
 
-      // ✅ USE YOUR WORKING METHOD: base64-arraybuffer
       const arrayBuffer = decode(selectedImage.base64);
 
-      // Upload to Doctor_Prescriptions bucket
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('Doctor_Prescriptions')
         .upload(filePath, arrayBuffer, {
@@ -101,14 +95,12 @@ const DoctorUploadPrescriptionScreen = () => {
 
       console.log('✅ Upload successful!');
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('Doctor_Prescriptions')
         .getPublicUrl(filePath);
 
       console.log('🔗 Public URL:', urlData.publicUrl);
 
-      // Save metadata to database
       const { error: dbError } = await supabase
         .from('doctor_prescriptions')
         .insert({
@@ -125,6 +117,9 @@ const DoctorUploadPrescriptionScreen = () => {
         Alert.alert('Error', 'Failed to save prescription details');
         return;
       }
+
+      // ===== 🔥 NEW: TRIGGER OCR PROCESSING =====
+      triggerOCRProcessing(urlData.publicUrl, selectedImage.fileName || fileName, userId, 'doctor');
 
       Alert.alert(
         'Success',
@@ -144,9 +139,67 @@ const DoctorUploadPrescriptionScreen = () => {
     }
   };
 
+  // ===== 🔥 NEW FUNCTION: TRIGGER OCR =====
+  // ===== 🔥 FIXED: TRIGGER OCR (No Stack Overflow) =====
+const triggerOCRProcessing = async (
+  fileUrl: string, 
+  fileName: string, 
+  userId: string, 
+  uploadedBy: 'doctor'
+) => {
+  // Prevent multiple simultaneous calls
+  if ((global as any).ocrProcessing) {
+    return;
+  }
+  
+  try {
+    (global as any).ocrProcessing = true;
+    console.log('🔍 Starting OCR for:', fileName);
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      console.log('⚠️ No auth token, skipping OCR');
+      return;
+    }
+
+    const response = await fetch(
+      'https://uzybksfptohhqyrtoanq.supabase.co/functions/v1/process-document',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          fileUrl: fileUrl,
+          fileName: fileName,
+          userId: userId,
+          uploadedBy: uploadedBy
+        })
+      }
+    );
+
+    if (response.ok) {
+      const result: any = await response.json();
+      if (result.success) {
+        console.log('✅ OCR Success:', result.extraction?.document_type || 'processed');
+      } else {
+        console.log('⚠️ OCR processing issue');
+      }
+    } else {
+      console.log('⚠️ OCR request failed');
+    }
+  } catch (error) {
+    // Don't log the error object to avoid recursion
+    console.log('⚠️ OCR failed - continuing without it');
+  } finally {
+    (global as any).ocrProcessing = false;
+  }
+};
+
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backIcon}>‹</Text>
@@ -157,14 +210,13 @@ const DoctorUploadPrescriptionScreen = () => {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Image Preview */}
+      <View style={styles.content}>
         {selectedImage ? (
           <View style={styles.imagePreviewContainer}>
             <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
             <TouchableOpacity
-              style={styles.removeImageButton}
               onPress={() => setSelectedImage(null)}
+              style={styles.removeImageButton}
             >
               <Text style={styles.removeImageText}>✕ Remove</Text>
             </TouchableOpacity>
@@ -176,46 +228,29 @@ const DoctorUploadPrescriptionScreen = () => {
           </View>
         )}
 
-        {/* Action Buttons */}
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={styles.smallButton}
-            onPress={pickFromCamera}
-            disabled={uploading}
-          >
+          <TouchableOpacity style={styles.smallButton} onPress={pickFromCamera}>
             <Text style={styles.smallButtonText}>Take Photo</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.smallButton}
-            onPress={pickFromGallery}
-            disabled={uploading}
-          >
+          <TouchableOpacity style={styles.smallButton} onPress={pickFromGallery}>
             <Text style={styles.smallButtonText}>Choose from Gallery</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Notes Input */}
         <View style={styles.notesContainer}>
           <Text style={styles.notesLabel}>Notes (Optional)</Text>
           <TextInput
             style={styles.notesInput}
-            placeholder="Add notes about this prescription..."
             value={notes}
             onChangeText={setNotes}
+            placeholder="Add prescription notes or instructions..."
             multiline
-            numberOfLines={4}
             textAlignVertical="top"
-            editable={!uploading}
           />
         </View>
 
-        {/* Upload Button */}
         <TouchableOpacity
-          style={[
-            styles.uploadButton,
-            (!selectedImage || uploading) && styles.uploadButtonDisabled,
-          ]}
+          style={[styles.uploadButton, (!selectedImage || uploading) && styles.uploadButtonDisabled]}
           onPress={uploadPrescription}
           disabled={!selectedImage || uploading}
         >
@@ -225,8 +260,8 @@ const DoctorUploadPrescriptionScreen = () => {
             <Text style={styles.uploadButtonText}>Upload Prescription</Text>
           )}
         </TouchableOpacity>
-      </ScrollView>
-    </View>
+      </View>
+    </ScrollView>
   );
 };
 

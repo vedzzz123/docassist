@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  Pressable,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -13,18 +12,22 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { CommonActions } from '@react-navigation/native';
+import { supabase } from './App';
 
 const screenWidth = Dimensions.get('window').width;
 
-const DoctorPortal: React.FC = () => {
+interface DoctorPortalProps {
+  setIsDoctorMode?: (value: boolean) => void;
+}
+
+const DoctorPortal: React.FC<DoctorPortalProps> = ({ setIsDoctorMode }) => {
   const systemTheme = useColorScheme();
   const [theme, setTheme] = useState(systemTheme === 'dark' ? 'dark' : 'light');
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useState(new Animated.Value(-screenWidth))[0];
-  const navigation = useNavigation<any>(); // ✅ Add <any> here
+  const navigation = useNavigation<any>();
 
-  // ✅ Fix the function typing
-  const handleNavigation = (screen: any) => {
+  const handleNavigation = (screen: string) => {
     navigation.navigate(screen);
   };
 
@@ -42,25 +45,33 @@ const DoctorPortal: React.FC = () => {
   };
 
   const signOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          onPress: () => {
+  Alert.alert(
+    'Sign Out',
+    'Are you sure you want to sign out?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        onPress: () => {
+          // Set doctor mode to false
+          if (setIsDoctorMode) {
+            setIsDoctorMode(false);
+          }
+          
+          // Navigate back to SignIn
+          setTimeout(() => {
             navigation.dispatch(
               CommonActions.reset({
                 index: 0,
                 routes: [{ name: 'SignIn' }],
               })
             );
-          },
+          }, 100);
         },
-      ]
-    );
-  };
+      },
+    ]
+  );
+};
 
   const isDarkMode = theme === 'dark';
   const styles = getStyles(isDarkMode);
@@ -69,7 +80,7 @@ const DoctorPortal: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.menuButton} onPress={toggleMenu}>
+        <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
           <Text style={styles.menuIcon}>☰</Text>
         </TouchableOpacity>
         <Text style={styles.headerText}>DocAssist - Doctor</Text>
@@ -78,19 +89,19 @@ const DoctorPortal: React.FC = () => {
       {/* Slide-out Drawer Menu */}
       {menuVisible && (
         <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
-          <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
+          <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
             <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={toggleTheme}>
+          <TouchableOpacity onPress={toggleTheme} style={styles.menuItem}>
             <Text style={styles.menuText}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Settings Clicked')}>
+          <TouchableOpacity onPress={() => Alert.alert('Settings Clicked')} style={styles.menuItem}>
             <Text style={styles.menuText}>Settings</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={signOut}>
+          <TouchableOpacity onPress={signOut} style={styles.menuItem}>
             <Text style={styles.menuText}>Sign Out</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={() => handleNavigation('DoctorProfile')}>
+          <TouchableOpacity onPress={() => Alert.alert('Profile feature coming soon!')} style={styles.menuItem}>
             <Text style={styles.menuText}>My Profile</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -98,19 +109,26 @@ const DoctorPortal: React.FC = () => {
 
       {/* Dashboard Content */}
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.welcomeTitle}>👨‍⚕️ Welcome, Dr. Mehta</Text>
+        <Text style={styles.welcomeTitle}>Welcome, Dr. Mehta</Text>
         <Text style={styles.welcomeSubtitle}>Here's your dashboard</Text>
 
         <View style={styles.gridContainer}>
           {/* Row 1 */}
           <View style={styles.row}>
-            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('AppointmentsScreen')}>
+            {/* Show Appointments - Navigate to AppointmentsScreen */}
+            <TouchableOpacity 
+              style={styles.gridCard} 
+              onPress={() => handleNavigation('AppointmentsScreen')}
+            >
               <Text style={styles.cardIcon}>📅</Text>
               <Text style={styles.gridCardTitle}>Show{'\n'}Appointments</Text>
             </TouchableOpacity>
 
-            {/* ✅ CHANGED: Now navigates to PatientsListScreen */}
-            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('PatientsListScreen')}>
+            {/* Manage Prescriptions - Shows list of patients with files */}
+            <TouchableOpacity 
+              style={styles.gridCard} 
+              onPress={() => handleNavigation('PatientsList')}
+            >
               <Text style={styles.cardIcon}>💊</Text>
               <Text style={styles.gridCardTitle}>Manage{'\n'}Prescriptions</Text>
             </TouchableOpacity>
@@ -118,12 +136,18 @@ const DoctorPortal: React.FC = () => {
 
           {/* Row 2 */}
           <View style={styles.row}>
-            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('AnalyticsScreen')}>
+            <TouchableOpacity 
+              style={styles.gridCard} 
+              onPress={() => Alert.alert('Analytics', 'Analytics feature coming soon!')}
+            >
               <Text style={styles.cardIcon}>📊</Text>
               <Text style={styles.gridCardTitle}>View{'\n'}Analytics</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.gridCard} onPress={() => handleNavigation('AIChatbot')}>
+            <TouchableOpacity 
+              style={styles.gridCard} 
+              onPress={() => Alert.alert('AI Chatbot', 'AI Chatbot feature coming soon!')}
+            >
               <Text style={styles.cardIcon}>🤖</Text>
               <Text style={styles.gridCardTitle}>Enable AI{'\n'}Chatbot</Text>
             </TouchableOpacity>

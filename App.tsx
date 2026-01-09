@@ -11,7 +11,6 @@ import BookLab from "./BookLab.tsx";
 import LabTests from "./LabTests.tsx";
 import LabDetailsScreen from "./LabDetailsScreen.tsx";
 import PrescriptionPage from './PrescriptionPage';
-import PersonalDetailsScreen from './PersonalDetailsScreen.tsx';
 import AppointmentsScreen from "./AppointmentsScreen.tsx";
 import ManagePrescriptionsScreen from "./ManagePrescriptionsScreen.tsx";
 import DoctorPage from './DoctorPortal.tsx';
@@ -30,6 +29,9 @@ import ClinicLocation from './ClinicLocation.tsx';
 import Alerts from "./Alerts.tsx";
 import MyProfile from "./MyProfile.tsx";
 import RazorpayCheckout from 'react-native-razorpay';
+import PhoneInputScreen from './PhoneInputScreen';
+import OTPVerificationScreen from './OTPVerificationScreen';
+import UserDetailsScreen from './UserDetailsScreen';
 
 GoogleSignin.configure({
   webClientId: '195933112183-ju65vtarf5lmi809d3s38nv2tja4iadb.apps.googleusercontent.com',
@@ -50,29 +52,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 
 const Stack = createNativeStackNavigator();
 
-// Helper function to check if user has completed personal details
-const checkUserDetailsCompletion = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from("user_details")
-      .select("uid")
-      .eq("user_id", userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error("Error checking user details:", error);
-      return false;
-    }
-
-    return !!data;
-  } catch (error) {
-    console.error("Error in checkUserDetailsCompletion:", error);
-    return false;
-  }
-};
-
 const App = () => {
-  const [session, setSession] = useState<Session | null>(null); // ✅ FIXED TypeScript error
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDoctorMode, setIsDoctorMode] = useState(false);
 
@@ -92,9 +73,9 @@ const App = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FA' }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8F9FA" }}>
         <ActivityIndicator size="large" color="#0057b3" />
-        <Text style={{ marginTop: 10, fontSize: 16, color: '#666' }}>Loading...</Text>
+        <Text style={{ marginTop: 10, fontSize: 16, color: "#666" }}>Loading...</Text>
       </View>
     );
   }
@@ -104,15 +85,15 @@ const App = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session && session.user ? (
           <>
-            {/* User authenticated screens */}
-            <Stack.Screen name="Home">
-            {(props) => <HomePage {...props} session={session!} />}
+            {/* User authenticated screens - UserDetails comes FIRST */}
+            <Stack.Screen name="UserDetails" component={UserDetailsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="HomePage">
+              {(props) => <HomePage {...props} session={session!} />}
             </Stack.Screen>
             <Stack.Screen name="PrescriptionPage" options={{ title: "Prescriptions" }}>
               {(props) => <PrescriptionPage {...props} session={session} />}
             </Stack.Screen>
             
-            <Stack.Screen name="PersonalDetails" component={PersonalDetailsScreen} />
             <Stack.Screen name="SelectDoctor" component={SelectDoctor} />
             <Stack.Screen name="AppointmentReceipt" component={AppointmentReceipt} />
             <Stack.Screen name="PaymentPage" component={PaymentPage} />
@@ -120,9 +101,7 @@ const App = () => {
             <Stack.Screen name="LabTests" component={LabTests} />
             <Stack.Screen name="LabDetailsScreen" component={LabDetailsScreen} />
             <Stack.Screen name="Prescriptions" component={ManagePrescriptionsScreen} />
-
             <Stack.Screen name="AppointmentsScreen" component={AppointmentsScreen} />
-            
             <Stack.Screen name="Articles" component={Articles} />
             <Stack.Screen name="Chatbot" component={Chatbot} />
             <Stack.Screen name="ClinicLocation" component={ClinicLocation} />
@@ -132,19 +111,24 @@ const App = () => {
         ) : isDoctorMode ? (
           <>
             {/* Doctor mode screens */}
-            <Stack.Screen name="DoctorPage" component={DoctorPage} />
+            <Stack.Screen name="DoctorPage">
+              {(props) => <DoctorPage {...props} setIsDoctorMode={setIsDoctorMode} />}
+            </Stack.Screen>
+            <Stack.Screen name="AppointmentsScreen" component={AppointmentsScreen} />
             <Stack.Screen name="DoctorUploadPrescription" component={DoctorUploadPrescriptionScreen} />
             <Stack.Screen name="PatientsList" component={PatientsListScreen} />
             <Stack.Screen name="PatientFiles" component={PatientFilesScreen} />
             <Stack.Screen name="ImageViewer" component={ImageViewerScreen} />
-          </>
+  </>
         ) : (
           <>
             {/* Authentication screens */}
-            <Stack.Screen name="SignIn">
+            <Stack.Screen name="SignIn" options={{ headerShown: false }}>
               {(props) => <SignInScreen {...props} setIsDoctorMode={setIsDoctorMode} />}
             </Stack.Screen>
-            <Stack.Screen name="SignUp" component={SignUpScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="PhoneInput" component={PhoneInputScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} options={{ headerShown: false }} />
           </>
         )}
       </Stack.Navigator>
@@ -180,11 +164,9 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
         setLoading(true);
         setErrorMessage("");
         console.log("🩺 Doctor login detected - navigating to DoctorPage");
-
         if (setIsDoctorMode) {
           setIsDoctorMode(true);
         }
-
         setTimeout(() => {
           navigation.navigate("DoctorPage");
         }, 100);
@@ -214,18 +196,7 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
 
       if (data?.session) {
         console.log("✅ Email sign-in successful:", data.session.user.email);
-        
-        // Check if user has completed personal details
-        const hasPersonalDetails = await checkUserDetailsCompletion(data.session.user.id);
-        
-        if (hasPersonalDetails) {
-          console.log("🏠 Existing user with personal details - going to Home");
-          // Session management will handle navigation to Home automatically
-        } else {
-          console.log("📄 New user or incomplete profile - needs personal details");
-          navigation.navigate('MyProfile')  // ✅ Shows saved profile data
-
-        }
+        // Session will handle the navigation automatically
       }
     } catch (error) {
       setErrorMessage("An unexpected error occurred.");
@@ -239,16 +210,13 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
     try {
       setLoading(true);
       setErrorMessage("");
-
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       await GoogleSignin.signOut();
       const userInfo = await GoogleSignin.signIn();
-
       const userEmail = (userInfo as any).user?.email || "No email";
       console.log("Google User Info:", userEmail);
 
       const { idToken } = await GoogleSignin.getTokens();
-
       if (!idToken) {
         throw new Error("No ID token received from Google");
       }
@@ -263,19 +231,7 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
         setErrorMessage("Google sign-in failed: " + error.message);
       } else if (data?.user) {
         console.log("✅ Google sign-in successful:", data.user.email);
-        
-        // Check if user has completed personal details
-        const hasPersonalDetails = await checkUserDetailsCompletion(data.user.id);
-        
-        if (hasPersonalDetails) {
-          console.log("🏠 Existing user with personal details - going to Home");
-          // Session management will handle navigation to Home automatically
-        } else {
-          console.log("📄 New user or incomplete profile - needs personal details");
-          setTimeout(() => {
-            navigation.navigate('MyProfile')  // ✅ Shows saved profile data
-          }, 1000);
-        }
+        // Session will handle the navigation automatically
       }
     } catch (error: any) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -294,46 +250,14 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
   };
 
   const handleOTPSignIn = async () => {
-    if (!email) {
-      setErrorMessage("Please enter your email to receive a magic link.");
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      setErrorMessage("Please enter a valid email address.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email,
-      });
-
-      if (error) {
-        setErrorMessage(error.message);
-        return;
-      }
-
-      Alert.alert(
-        "Check your email",
-        "We've sent you a magic link to sign in.",
-        [{ text: "OK" }]
-      );
-    } catch (error) {
-      setErrorMessage("Failed to send magic link.");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    navigation.navigate('PhoneInput');
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Let's Get you in</Text>
-
       {loading ? <ActivityIndicator size="large" color="#007BFF" /> : null}
-
+      
       {errorMessage && (
         <View style={styles.errorMessageBox}>
           <Text style={styles.messageText}>{errorMessage}</Text>
@@ -349,7 +273,6 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
         keyboardType="email-address"
         autoCapitalize="none"
       />
-
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -358,7 +281,7 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
         onChangeText={setPassword}
         secureTextEntry
       />
-
+      
       <TouchableOpacity
         style={[styles.signInButton, loading && styles.disabledButton]}
         onPress={handleSignIn}
@@ -381,6 +304,7 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
         onPress={handleOTPSignIn}
         disabled={loading}
       >
+        <Image source={require('./assets/phone.png')} style={styles.iconImage} />
         <Text style={styles.buttonText}>Continue with OTP</Text>
       </TouchableOpacity>
 
@@ -388,11 +312,11 @@ const SignInScreen = ({ navigation, setIsDoctorMode }: { navigation: any, setIsD
         style={[styles.button, loading && styles.disabledButton]}
         disabled={loading}
       >
-        <Text style={styles.buttonText}>Continue with Yahoo</Text>
+        <Text style={styles.buttonText}>Continue with Fingerprint</Text>
       </TouchableOpacity>
 
       <Text style={styles.signupText}>
-        Don't have an account?
+        Don't have an account?{" "}
         <Text
           style={styles.signupLink}
           onPress={() => !loading && navigation.navigate("SignUp")}

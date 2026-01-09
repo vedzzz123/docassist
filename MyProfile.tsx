@@ -50,43 +50,51 @@ const MyProfile = ({ navigation }: any) => {
   }, []);
 
   const fetchUserProfile = async () => {
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        console.error('User not found');
-        setLoading(false);
-        return;
-      }
-
-      setUserEmail(user.email || '');
-
-      const { data, error } = await supabase
-        .from('user_details')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        Alert.alert('Error', 'Failed to load profile');
-      } else {
-        console.log('✅ Profile loaded:', data);
-        setProfile(data);
-        // Set edit form values
-        setEditedName(data.name);
-        setEditedSurname(data.surname);
-        setEditedAge(data.age.toString());
-        setEditedGender(data.gender);
-        setEditedWeight(data.weight.toString());
-        setEditedPhone(data.phone_num);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('User not found');
       setLoading(false);
+      return;
     }
-  };
+
+    setUserEmail(user.email || user.phone || '');
+
+    const { data, error } = await supabase
+      .from('user_details')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle(); // ✅ CHANGED FROM .single() TO .maybeSingle()
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching profile:', error);
+      Alert.alert('Error', 'Failed to load profile');
+      setLoading(false);
+      return;
+    }
+
+    if (data) {
+      console.log('✅ Profile loaded:', data);
+      setProfile(data);
+      // Set edit form values
+      setEditedName(data.name);
+      setEditedSurname(data.surname);
+      setEditedAge(data.age.toString());
+      setEditedGender(data.gender);
+      setEditedWeight(data.weight.toString());
+      setEditedPhone(data.phone_num);
+    } else {
+      console.log('❌ No profile found - user should use UserDetails screen');
+      setProfile(null);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleEditProfile = () => {
     setEditMode(true);

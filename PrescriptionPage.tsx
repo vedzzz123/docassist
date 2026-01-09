@@ -75,7 +75,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
         })),
       ];
 
-      combinedImages.sort((a, b) => 
+      combinedImages.sort((a, b) =>
         new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
       );
 
@@ -145,7 +145,6 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
       const fileExt = asset.fileName?.split('.').pop() || 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
-
       const arrayBuffer = decode(asset.base64);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -181,6 +180,9 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
         return;
       }
 
+      // ===== 🔥 NEW: TRIGGER OCR PROCESSING =====
+      triggerOCRProcessing(urlData.publicUrl, asset.fileName || fileName, userId, 'patient');
+
       Alert.alert('Success', 'Prescription uploaded successfully!');
       loadExistingImages();
     } catch (error) {
@@ -188,6 +190,68 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
       Alert.alert('Error', 'Failed to upload prescription');
     }
   };
+
+  // ===== 🔥 NEW FUNCTION: TRIGGER OCR =====
+  // ===== 🔥 FIXED: TRIGGER OCR WITH PROPER TYPING =====
+// ===== 🔥 FIXED: TRIGGER OCR (No Stack Overflow) =====
+const triggerOCRProcessing = async (
+  fileUrl: string, 
+  fileName: string, 
+  userId: string, 
+  uploadedBy: 'patient' | 'doctor'
+) => {
+  // Prevent multiple simultaneous calls
+  if ((global as any).ocrProcessing) {
+    return;
+  }
+  
+  try {
+    (global as any).ocrProcessing = true;
+    console.log('🔍 Starting OCR for:', fileName);
+    
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    
+    if (!currentSession?.access_token) {
+      console.log('⚠️ No auth token, skipping OCR');
+      return;
+    }
+
+    const response = await fetch(
+      'https://uzybksfptohhqyrtoanq.supabase.co/functions/v1/process-document',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`,
+        },
+        body: JSON.stringify({
+          fileUrl: fileUrl,
+          fileName: fileName,
+          userId: userId,
+          uploadedBy: uploadedBy
+        })
+      }
+    );
+
+    if (response.ok) {
+      const result: any = await response.json();
+      if (result.success) {
+        console.log('✅ OCR Success:', result.extraction?.document_type || 'processed');
+      } else {
+        console.log('⚠️ OCR processing issue');
+      }
+    } else {
+      console.log('⚠️ OCR request failed');
+    }
+  } catch (error) {
+    // Don't log the error object to avoid recursion
+    console.log('⚠️ OCR failed - continuing without it');
+  } finally {
+    (global as any).ocrProcessing = false;
+  }
+};
+
+
 
   const deleteImage = async (image: PrescriptionImage, index: number) => {
     if (image.uploaded_by === 'doctor') {
@@ -236,6 +300,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
       Alert.alert('Cannot Rename', 'You cannot rename prescriptions uploaded by your doctor.');
       return;
     }
+
     setSelectedImageIndex(index);
     setNewName(images[index].name);
     setRenameModalVisible(true);
@@ -246,7 +311,6 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
 
     try {
       const image = images[selectedImageIndex];
-      
       const { error } = await supabase
         .from('prescriptions')
         .update({ file_name: newName })
@@ -275,95 +339,106 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>My Prescriptions</Text>
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={pickImageFromGallery}>
-          <Text style={styles.buttonText}>UPLOAD</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={takePhotoWithCamera}>
-          <Text style={styles.buttonText}>TAKE PHOTO</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <Text style={styles.loadingText}>Loading prescriptions...</Text>
-      ) : images.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No prescriptions uploaded yet</Text>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.title}>My Prescriptions</Text>
+        
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.button} onPress={pickImageFromGallery}>
+            <Text style={styles.buttonText}>UPLOAD</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.button} onPress={takePhotoWithCamera}>
+            <Text style={styles.buttonText}>TAKE PHOTO</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.imageList}>
-          {images.map((image, index) => (
-            <View 
-              key={image.id} 
-              style={[
-                styles.imageCard,
-                image.uploaded_by === 'doctor' && styles.doctorCard
-              ]}
-            >
-              <View style={styles.cardHeader}>
-                <View style={styles.cardTitleContainer}>
-                  <TouchableOpacity onPress={() => openImage(image.uri)}>
-                      <Text style={styles.imageName} numberOfLines={1}>{image.name}</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.dateText}>{new Date(image.uploaded_at).toLocaleDateString()}</Text>
+
+        {loading ? (
+          <Text style={styles.loadingText}>Loading prescriptions...</Text>
+        ) : images.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No prescriptions uploaded yet</Text>
+          </View>
+        ) : (
+          <View style={styles.imageList}>
+            {images.map((image, index) => (
+              <TouchableOpacity
+                key={image.id}
+                style={[
+                  styles.imageCard,
+                  image.uploaded_by === 'doctor' && styles.doctorCard
+                ]}
+                onPress={() => openImage(image.uri)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardTitleContainer}>
+                    <Text style={styles.imageName}>{image.name}</Text>
+                    <Text style={styles.dateText}>
+                      {new Date(image.uploaded_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  
+                  <View style={[
+                    styles.badge,
+                    image.uploaded_by === 'doctor' ? styles.doctorBadge : styles.patientBadge
+                  ]}>
+                    <Text style={styles.badgeText}>
+                      {image.uploaded_by === 'doctor' ? 'Doctor' : 'Patient'}
+                    </Text>
+                  </View>
                 </View>
-                <View style={[
-                  styles.badge,
-                  image.uploaded_by === 'doctor' ? styles.doctorBadge : styles.patientBadge
-                ]}>
-                  <Text style={styles.badgeText}>
-                    {image.uploaded_by === 'doctor' ? 'Doctor' : 'Patient'}
-                  </Text>
-                </View>
-              </View>
 
-              {image.notes && (
-                <View style={styles.notesContainer}>
-                  <Text style={styles.notesLabel}>Notes:</Text>
-                  <Text style={styles.notesText}>{image.notes}</Text>
-                </View>
-              )}
-
-              {image.doctor_name && (
-                <Text style={styles.doctorNameText}>Uploaded by: {image.doctor_name}</Text>
-              )}
-
-              <View style={styles.imageActions}>
-                <TouchableOpacity 
-                  style={styles.actionButton} 
-                  onPress={() => openImage(image.uri)}
-                >
-                  <Text style={styles.actionText}>View</Text>
-                </TouchableOpacity>
-
-                {image.uploaded_by === 'patient' && (
-                  <>
-                    <TouchableOpacity 
-                      style={styles.actionButton} 
-                      onPress={() => openRenameModal(index)}
-                    >
-                      <Text style={styles.actionText}>Rename</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.deleteButton]} 
-                      onPress={() => deleteImage(image, index)}
-                    >
-                      <Text style={styles.deleteText}>Delete</Text>
-                    </TouchableOpacity>
-                  </>
+                {image.notes && (
+                  <View style={styles.notesContainer}>
+                    <Text style={styles.notesLabel}>Notes:</Text>
+                    <Text style={styles.notesText}>{image.notes}</Text>
+                  </View>
                 )}
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
 
-      <Modal visible={renameModalVisible} transparent animationType="slide">
+                {image.doctor_name && (
+                  <Text style={styles.doctorNameText}>
+                    Uploaded by: {image.doctor_name}
+                  </Text>
+                )}
+
+                <View style={styles.imageActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => openImage(image.uri)}
+                  >
+                    <Text style={styles.actionText}>View</Text>
+                  </TouchableOpacity>
+
+                  {image.uploaded_by === 'patient' && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => openRenameModal(index)}
+                      >
+                        <Text style={styles.actionText}>Rename</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.deleteButton]}
+                        onPress={() => deleteImage(image, index)}
+                      >
+                        <Text style={styles.deleteText}>Delete</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      <Modal
+        visible={renameModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setRenameModalVisible(false)}
+      >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Rename Prescription</Text>
@@ -374,14 +449,14 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
               placeholder="Enter new name"
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={styles.modalButton} 
+              <TouchableOpacity
+                style={styles.modalButton}
                 onPress={() => setRenameModalVisible(false)}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.saveButton]} 
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
                 onPress={renameImage}
               >
                 <Text style={styles.saveButtonText}>Save</Text>
@@ -390,7 +465,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ session, navigation
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 };
 

@@ -195,7 +195,7 @@ const PatientFilesScreen = () => {
       {/* Floating Action Button */}
       <TouchableOpacity
         style={styles.fabButton}
-        onPress={() => navigation.navigate('DoctorUploadPrescriptionScreen', {
+        onPress={() => navigation.navigate('DoctorUploadPrescription', {
           userId: userId,
           patientName: patientName,
         })}

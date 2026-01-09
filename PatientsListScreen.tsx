@@ -104,11 +104,12 @@ const PatientsListScreen = () => {
   };
 
   const openPatientFiles = (patient: PatientWithFiles) => {
-    navigation.navigate('PatientFilesScreen', {
-      userId: patient.user_id,
-      patientName: patient.patient_name,
-    });
-  };
+  (navigation as any).navigate('PatientFiles', {
+    userId: patient.user_id,
+    patientName: patient.patient_name,
+  });
+};
+
 
   const renderPatientCard = ({ item }: { item: PatientWithFiles }) => (
     <TouchableOpacity
